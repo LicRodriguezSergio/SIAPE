@@ -1,0 +1,13 @@
+SIAPE PROFESIONAL V2.5 — ENTREVISTA Y NOTAS
+
+Se incorporó una pantalla exclusiva “Entrevista y notas” con:
+- identificación de fecha, hora, lugar y área;
+- personas entrevistadas y equipo auditor;
+- síntesis de la entrevista;
+- documentación o evidencia mencionada;
+- compromisos y plazos;
+- datos adicionales y observaciones del auditor;
+- guardado automático;
+- opción para incluir o excluir el contenido del informe PDF.
+
+Abrir ABRIR_SIAPE_DIRECTO.html.

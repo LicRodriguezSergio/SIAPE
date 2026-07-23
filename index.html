@@ -1,0 +1,88 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123d5a"><title>SIAPE Profesional V2.4 · Cuidados progresivos corregido</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="styles.css"></head><body>
+<header><h1>SIAPE · Sistema Integral de Auditoría Prestacional</h1><p>Informe institucional basado en modelo GAP · biblioteca normativa por servicio · PC y tablet</p><nav>
+<button class="navbtn active" onclick="showPage('startPage',this)">Inicio</button><button class="navbtn" onclick="showPage('auditPage',this)">Auditorías</button><button class="navbtn" onclick="showPage('interviewPage',this)">Entrevista y notas</button><button class="navbtn" onclick="showPage('rrhhPage',this)">RRHH Enfermería</button><button class="navbtn ai-nav" onclick="showPage('aiPage',this)">🧠 Motor IA</button><button class="navbtn" onclick="showPage('dashPage',this)">Panel general</button><button class="navbtn" onclick="showPage('summaryPage',this)">Resumen y acta</button><button class="navbtn" onclick="showPage('devPage',this)">Desvíos</button><button class="navbtn" onclick="showPage('planPage',this)">Plan de mejora</button><button class="navbtn" onclick="showPage('normPage',this)">Normativa</button><button class="navbtn" onclick="showPage('reportPage',this)">Informe PDF</button>
+</nav></header><main>
+<section id="startPage" class="page active"><div class="card"><h2>Identificación de la auditoría</h2><div class="grid">
+<div><label>Número de informe</label><input data-meta="reportNumber" inputmode="numeric" placeholder="188"></div><div><label>Año del informe</label><input data-meta="reportYear" inputmode="numeric" placeholder="2026"></div><div><label>Prestador</label><input data-meta="prestador"></div><div><label>CUIT</label><input data-meta="cuit"></div><div><label>Provincia / jurisdicción</label><select data-meta="province"><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Santiago del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div><div><label>Nivel PAMI</label><select data-meta="level"><option>I</option><option>II</option><option>III</option><option>IV</option></select></div>
+<div><label>Tipo de establecimiento</label><select data-meta="type"><option>Privado</option><option>Público</option><option>Mixto</option></select></div><div><label>Fecha</label><input type="date" data-meta="date"></div><div><label>Auditor</label><input data-meta="auditor"></div><div><label>Domicilio</label><input data-meta="address"></div></div></div>
+<div class="card"><h2>Áreas a auditar</h2><div class="grid"><label><input style="width:auto" type="checkbox" data-area="Enfermería"> Enfermería</label><label><input style="width:auto" type="checkbox" data-area="Esterilización"> Esterilización</label><label><input style="width:auto" type="checkbox" data-area="Hemodinamia"> Hemodinamia</label><label><input style="width:auto" type="checkbox" data-area="Limpieza"> Limpieza</label><label><input style="width:auto" type="checkbox" data-area="Lavadero"> Lavadero</label></div></div>
+<div class="card ai-launch"><h2>🧠 Motor IA SIAPE</h2><p>El motor inteligente está incorporado y funciona en modo local sin Internet. Con un servidor online seguro podrá utilizar IA generativa desde la tablet.</p><div class="toolbar"><button class="primary" onclick="showPage('aiPage',document.querySelector('.ai-nav'))">Abrir Motor IA</button></div></div>
+<div class="card"><h2>Gestión de la auditoría</h2><div class="toolbar"><button class="primary" onclick="showPage('auditPage',document.querySelectorAll('.navbtn')[1])">Comenzar auditoría</button><button class="savebtn" onclick="saveAuditSnapshot()" title="Guardar auditoría en este dispositivo">💾 Guardar auditoría</button><button class="secondary" onclick="exportJSON()">Exportar copia</button><label class="secondary">Importar copia<input class="hide" type="file" accept=".json" onchange="importJSON(this)"></label><button class="danger" onclick="resetAudit()">Nueva auditoría</button></div><div class="notice">El guardado automático conserva la auditoría actual. El botón 💾 guarda además una copia identificada por número de informe, año y prestador en esta PC o tablet. Para pasarla a otro dispositivo, use Exportar/Importar.</div></div><div class="card"><h2>Auditorías guardadas en este dispositivo</h2><div class="saved-search"><div><label>Buscar auditoría guardada</label><input id="savedAuditSearch" type="search" placeholder="N.º de informe, año, prestador, CUIT, fecha, auditor o provincia..." oninput="renderSavedAudits()"></div><button class="secondary" onclick="clearSavedAuditSearch()">Limpiar búsqueda</button></div><div id="savedAuditCount" class="small saved-count"></div><div id="savedAudits"></div></div></section>
+<section id="auditPage" class="page"><div id="serviceTabs" class="service-tabs"></div><div class="card toolbar"><input id="search" placeholder="Buscar código o requisito..." oninput="renderAudit()"><select id="domainFilter" onchange="renderAudit()"></select></div><div id="auditList"></div></section>
+
+
+<section id="interviewPage" class="page">
+  <div class="card interview-intro"><h2>Entrevista y datos adicionales</h2><p>Espacio independiente para registrar información obtenida durante la entrevista, aclaraciones del prestador y observaciones complementarias del auditor. Los datos se guardan junto con la auditoría.</p></div>
+  <div class="card"><h2>1. Identificación de la entrevista</h2><div class="grid">
+    <div><label>Fecha</label><input type="date" data-interview="date"></div>
+    <div><label>Hora</label><input type="time" data-interview="time"></div>
+    <div><label>Lugar / modalidad</label><input data-interview="place" placeholder="Presencial, virtual, oficina, servicio..."></div>
+    <div><label>Área o servicio</label><input data-interview="area" placeholder="Enfermería, Esterilización, Hemodinamia..."></div>
+  </div></div>
+  <div class="card"><h2>2. Personas entrevistadas</h2><div class="grid2">
+    <div><label>Nombre, apellido, cargo y matrícula</label><textarea data-interview="interviewees" rows="5" placeholder="Ej.: Lic. ..., Jefatura de Enfermería, MP ..."></textarea></div>
+    <div><label>Participantes por parte del equipo auditor</label><textarea data-interview="auditors" rows="5" placeholder="Auditores y otros participantes presentes"></textarea></div>
+  </div></div>
+  <div class="card"><h2>3. Registro de la entrevista</h2>
+    <label>Síntesis de lo manifestado por el prestador o personal entrevistado</label><textarea class="large-notes" data-interview="summary" placeholder="Registrar respuestas, explicaciones, antecedentes y aclaraciones relevantes..."></textarea>
+    <label>Documentación o evidencia mencionada / exhibida</label><textarea data-interview="documents" rows="5" placeholder="Planillas, protocolos, habilitaciones, registros, fotografías, notas internas..."></textarea>
+    <label>Compromisos asumidos y plazos informados</label><textarea data-interview="commitments" rows="5" placeholder="Acciones comprometidas, responsables y fechas propuestas..."></textarea>
+  </div>
+  <div class="card"><h2>4. Datos adicionales y comentarios del auditor</h2>
+    <label>Datos adicionales</label><textarea class="large-notes" data-interview="additional" placeholder="Información complementaria que no corresponde a un ítem específico de la guía..."></textarea>
+    <label>Observaciones reservadas del auditor</label><textarea class="large-notes" data-interview="auditorNotes" placeholder="Impresiones técnicas, puntos a verificar, inconsistencias o temas pendientes..."></textarea>
+    <div class="interview-options"><label class="checkline"><input type="checkbox" data-interview="includeInReport"> Incluir el registro de entrevista y datos adicionales en el informe PDF</label></div>
+    <div class="toolbar no-print"><button class="secondary" onclick="copyInterview()">Copiar registro</button><button class="danger" onclick="clearInterview()">Limpiar entrevista y notas</button></div>
+    <div id="interviewSaved" class="small autosave-note">Guardado automático activo.</div>
+  </div>
+</section>
+<section id="rrhhPage" class="page">
+  <div class="card"><h2>Recursos Humanos de Enfermería</h2><p class="notice">Módulo de prueba para cuantificar la cobertura de enfermería. Los parámetros son editables y el informe deja trazabilidad del método utilizado. La normativa jurisdiccional debe seleccionarse y validarse para cada auditoría.</p></div>
+  <div class="grid2">
+    <div class="card"><h2>1. Datos del servicio</h2><div class="grid">
+      <div><label>Servicio / sector</label><select data-rh="service"><option>Internación general</option><option>Guardia</option><option>UTI</option><option>UCO</option><option>Neonatología</option><option>Pediatría</option><option>Quirófano</option><option>Otro</option></select></div>
+      <div><label>Turno auditado</label><select data-rh="shift"><option>Mañana</option><option>Tarde</option><option>Noche</option></select></div>
+      <div><label>Camas habilitadas</label><input data-rh="beds" type="number" min="0" inputmode="numeric"></div>
+      <div><label>Camas ocupadas / pacientes</label><input data-rh="occupied" type="number" min="0" inputmode="numeric"></div>
+      <div><label>Norma o criterio aplicado</label><input data-rh="normRef" placeholder="Ej.: norma provincial / Res. ministerial"></div>
+      <div><label>Método de cálculo</label><select data-rh="method"><option value="normativa">Normativa</option><option value="progresivos">Cuidados progresivos</option><option value="upe">UPE</option><option value="mixto">Mixto</option></select></div>
+    </div></div>
+    <div class="card"><h2>2. Dotación observada en el turno</h2><div class="grid">
+      <div><label>Licenciados/as</label><input data-rh="licensed" type="number" min="0" inputmode="numeric"></div>
+      <div><label>Enfermeros/as</label><input data-rh="nurses" type="number" min="0" inputmode="numeric"></div>
+      <div><label>Auxiliares</label><input data-rh="assistants" type="number" min="0" inputmode="numeric"></div>
+      <div><label>Supervisores en atención directa</label><input data-rh="supervisors" type="number" min="0" inputmode="numeric"></div>
+      <div><label>Ausentismo del turno (%)</label><input data-rh="absence" type="number" min="0" max="100" step="0.1"></div>
+      <div><label>Observación / evidencia</label><textarea data-rh="evidence" rows="3" placeholder="Planilla de turnos, parte diario, entrevistas, observación directa..."></textarea></div>
+    </div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>3. Criterio normativo</h2><label>Personal requerido por turno según la norma seleccionada</label><input data-rh="requiredNorm" type="number" min="0" step="0.1"><p class="small">Se utiliza cuando el requisito normativo establece una relación o dotación concreta.</p></div>
+    <div class="card"><h2>4. Cuidados progresivos</h2><div class="tablewrap"><table><thead><tr><th>Clasificación</th><th>Pacientes</th><th>Minutos de cuidado por paciente en el turno</th></tr></thead><tbody>
+      <tr><td>Cuidados mínimos</td><td><input data-rh="pMin" type="number" min="0"></td><td><input data-rh="mMin" type="number" min="0"></td></tr>
+      <tr><td>Cuidados moderados</td><td><input data-rh="pMod" type="number" min="0"></td><td><input data-rh="mMod" type="number" min="0"></td></tr>
+      <tr><td>Cuidados especiales</td><td><input data-rh="pEsp" type="number" min="0"></td><td><input data-rh="mEsp" type="number" min="0"></td></tr>
+      <tr><td>Cuidados intensivos</td><td><input data-rh="pInt" type="number" min="0"></td><td><input data-rh="mInt" type="number" min="0"></td></tr>
+    </tbody></table></div><label>Minutos productivos por trabajador en el turno</label><input data-rh="productiveMinutes" type="number" min="1"><p class="small">El cálculo divide la carga total de cuidados del turno por los minutos productivos configurados.</p></div>
+  </div>
+  <div class="card"><h2>5. Método UPE</h2><div class="grid"><div><label>UPE requeridas en el turno</label><input data-rh="upeTotal" type="number" min="0" step="0.1"></div><div><label>Capacidad de UPE por trabajador en el turno</label><input data-rh="upePerWorker" type="number" min="0.1" step="0.1"></div></div><p class="small">Los valores deben surgir de la metodología UPE adoptada por el establecimiento o por la norma técnica utilizada.</p></div>
+  <div class="card"><div class="toolbar"><button class="primary" onclick="calculateRH()">Calcular dotación</button><button class="secondary" onclick="clearRH()">Limpiar módulo</button></div><div id="rhResults" class="rh-results"></div></div>
+</section>
+<section id="dashPage" class="page"><div class="card"><h2>Panel general de riesgo prestacional</h2><h3 id="overall"></h3><div id="kpis" class="kpis"></div></div><div class="card tablewrap"><table><thead><tr><th>Servicio</th><th>Ítems evaluables</th><th>Desvíos</th><th>Cumplimiento</th><th>Bajo</th><th>Moderado</th><th>Alto</th><th>Resultado</th></tr></thead><tbody id="serviceTable"></tbody></table></div></section>
+<section id="summaryPage" class="page"><div class="grid2"><div class="card"><h2>Resumen ejecutivo automático</h2><div id="execText" class="summary-text"></div><button class="secondary no-print" onclick="copyText('execText')">Copiar resumen</button></div><div class="card"><h2>Síntesis de desvíos para el acta</h2><div id="actText" class="summary-text"></div><button class="secondary no-print" onclick="copyText('actText')">Copiar síntesis</button></div></div>
+</section>
+
+<section id="aiPage" class="page">
+<div class="card"><h2>Asistente Inteligente SIAPE</h2><p class="notice">Analiza únicamente los desvíos detectados, la criticidad, los dominios afectados y el cálculo de Recursos Humanos de Enfermería. Puede generar textos, revisar inconsistencias y priorizar acciones.</p></div>
+<div class="card ai-card"><div class="ai-head"><div><h2>🧠 Motor inteligente SIAPE</h2><div id="aiConnection" class="small">Verificando conexión…</div></div><span id="aiBadge" class="badge">IA opcional</span></div>
+<p class="notice">Puede probar el análisis inteligente directamente en la tablet, aun sin servidor. Si más adelante se configura un servidor online seguro, el mismo botón utilizará IA generativa.</p>
+<div class="grid"><div><label>Servidor IA online (opcional)</label><input id="aiEndpoint" placeholder="Dejar vacío para usar el motor inteligente local"></div><div><label>Acción</label><select id="aiTask"><option value="full">Generar resumen, acta y conclusión</option><option value="review">Revisar inconsistencias</option><option value="priorities">Priorizar acciones correctivas</option></select></div></div>
+<div class="toolbar"><button class="primary" onclick="runAIAnalysis()">✨ Generar análisis inteligente</button><button class="secondary" onclick="saveAISettings()">Guardar configuración</button><button class="secondary" onclick="applyAIResult()">Aplicar textos al informe</button></div>
+<div id="aiStatus" class="small"></div><div id="aiResult" class="summary-text ai-result">Todavía no se ejecutó un análisis con IA.</div></div>
+<div class="grid2"><div class="card"><h2>Datos que analiza</h2><p>Respuestas NO, observaciones, riesgos, áreas, dominios, cálculo de dotación y normativa consignada.</p></div><div class="card"><h2>Privacidad</h2><p>El modo local no envía datos fuera de la tablet. El modo online solo se activa al configurar un servidor seguro.</p></div></div>
+</section>
+<section id="devPage" class="page"><div class="card"><h2>Desvíos consolidados</h2><div class="tablewrap"><table><thead><tr><th>Código</th><th>Área</th><th>Dominio</th><th>Desvío</th><th>Observación</th><th>Fundamentación</th><th>Riesgo</th><th>Recomendación</th><th>Responsable</th><th>Plazo</th><th>Normativa</th></tr></thead><tbody id="devRows"></tbody></table></div></div></section>
+<section id="planPage" class="page"><div class="card"><h2>Plan de mejora</h2><div class="tablewrap"><table><thead><tr><th>Código</th><th>Área</th><th>Desvío</th><th>Acción correctiva</th><th>Evidencia</th><th>Responsable</th><th>Plazo</th><th>Estado</th></tr></thead><tbody id="planRows"></tbody></table></div></div></section>
+<section id="normPage" class="page"><div class="card"><h2>Marco normativo nacional, CABA y provincial</h2><p class="notice">La base reproduce las referencias incluidas en SIAPE V16. Las normas marcadas como pendientes deben validarse documentalmente antes de citar artículos o utilizarlas como fundamento directo.</p><div class="tablewrap"><table><thead><tr><th>Ámbito</th><th>Jurisdicción</th><th>Norma</th><th>Reglamentación</th><th>Autoridad</th><th>Servicio</th><th>Validación</th></tr></thead><tbody id="normRows"></tbody></table></div></div></section>
+<section id="reportPage" class="page"><div class="toolbar no-print"><button class="primary" onclick="window.print()">Imprimir / Guardar como PDF</button></div><div id="reportContent"></div></section>
+</main><script src="data.js"></script><script src="app.js"></script><script>if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');</script></body></html>

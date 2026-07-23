@@ -1,0 +1,22 @@
+SIAPE V1.4 - PRUEBA EN TABLET
+
+1. Descomprima el archivo ZIP.
+2. Abra ABRIR_SIAPE_DIRECTO.html desde la tablet.
+3. Seleccione las áreas y complete algunos ítems marcando SI, NO, NO APLICA o NO EVALUADO.
+4. En los desvíos marcados NO, cargue observaciones.
+5. Ingrese a Resumen y acta.
+6. Deje vacío el campo Servidor IA online.
+7. Presione Generar análisis inteligente.
+8. Revise el resultado y presione Aplicar textos al informe.
+9. Ingrese a Informe PDF para visualizar o imprimir.
+
+Esta versión usa un motor inteligente local para que pueda probarse sin PC y sin clave API. La conexión con IA generativa online queda preparada para una etapa posterior mediante un servidor seguro alojado en Internet.
+
+ÁREAS INCLUIDAS EN ESTA PRUEBA:
+- Enfermería
+- Esterilización
+- Hemodinamia
+- Limpieza
+- Lavadero
+
+Hemodiálisis y Diálisis Peritoneal no se incorporaron todavía porque falta cargar y clasificar sus guías completas.

@@ -1,0 +1,8 @@
+SIAPE Profesional V2.4
+
+Corrección visual en Cuidados progresivos:
+- El encabezado azul de la tabla ya no tapa ni atraviesa los campos.
+- Se ajustó el encabezado fijo para que permanezca en la parte superior de la tabla.
+- Conserva Motor IA y cálculo de RRHH integrado en Enfermería.
+
+Abrir ABRIR_SIAPE_DIRECTO.html.

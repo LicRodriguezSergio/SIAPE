@@ -1,0 +1,19 @@
+SIAPE V1.3 - MODO IA HIBRIDO
+
+1. Sin Internet, SIAPE sigue funcionando normalmente.
+2. La clave API NO se guarda en el navegador ni en la tablet.
+3. Para IA segura, una PC actua como servidor:
+   - instalar Node.js en la PC;
+   - configurar OPENAI_API_KEY como variable de entorno;
+   - ejecutar INICIAR_SERVIDOR_IA_WINDOWS.bat;
+   - mantener PC y tablet conectadas a la misma red Wi-Fi.
+4. En la tablet abrir SIAPE desde la direccion que muestra la PC, por ejemplo:
+   http://192.168.1.20:3000
+5. En "Resumen y acta", configurar:
+   http://192.168.1.20:3000/api/siape-ai
+6. Presionar "Analizar con IA" y revisar el texto antes de aplicarlo.
+
+IMPORTANTE:
+- No incluir datos identificatorios de pacientes.
+- La IA es apoyo de redaccion y analisis; el auditor conserva la validacion final.
+- La API de OpenAI se factura por uso y es independiente de la suscripcion ChatGPT Plus.

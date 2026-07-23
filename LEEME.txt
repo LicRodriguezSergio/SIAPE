@@ -1,0 +1,16 @@
+SIAPE V0.7 - INFORME MODELO GAP Y GUARDADO DE AUDITORÍAS
+
+1. Extraer completamente el ZIP.
+2. Abrir ABRIR_SIAPE_DIRECTO.html.
+3. Completar número y año de informe.
+4. Para conservar una copia identificada en esa PC o tablet, presionar 💾 Guardar auditoría.
+5. Para trasladarla a otro dispositivo, usar Exportar copia e Importar copia.
+6. El PDF se genera desde Informe PDF > Imprimir / Guardar como PDF.
+
+El informe sigue la estructura del modelo aportado: datos, resumen ejecutivo, objeto, alcance, análisis, conclusiones, anexo legal y anexo técnico operativo por áreas con desvíos.
+
+NOVEDAD V0.8 - BUSCADOR DE AUDITORÍAS
+En Inicio, la sección de auditorías guardadas permite buscar por número de informe, año, prestador, CUIT, fecha, auditor o provincia.
+
+
+V1.2: La conclusión se recalcula automáticamente según cantidad, criticidad, áreas, temas y hallazgos registrados.

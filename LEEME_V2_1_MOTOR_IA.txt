@@ -1,0 +1,10 @@
+SIAPE PROFESIONAL V2.1 — MOTOR IA VISIBLE + RRHH ENFERMERÍA
+
+1. Abra ABRIR_SIAPE_DIRECTO.html o index.html.
+2. En el menú principal verá la solapa “🧠 Motor IA”.
+3. Marque algunos requisitos como NO y/o calcule RRHH Enfermería.
+4. Abra Motor IA y pulse “Generar análisis inteligente”.
+5. Sin servidor configurado trabaja con el motor inteligente local.
+6. “Aplicar textos al informe” incorpora el resultado al Resumen Ejecutivo, Acta y Conclusión.
+
+El motor IA no se eliminó: en esta versión quedó como módulo principal y visible.

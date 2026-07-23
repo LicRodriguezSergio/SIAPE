@@ -1,0 +1,10 @@
+SIAPE PROFESIONAL V2.0 - PRUEBA RRHH ENFERMERÍA
+
+1. Abra ABRIR_SIAPE_DIRECTO.html en PC o tablet.
+2. Ingrese a RRHH Enfermería.
+3. Cargue servicio, turno y dotación observada.
+4. Seleccione Normativa, Cuidados progresivos, UPE o Mixto.
+5. Complete los parámetros del método y presione Calcular dotación.
+6. Si la cobertura es menor al 95 %, SIAPE genera automáticamente el desvío ENF-RH-001 y lo incorpora al resumen, desvíos, conclusión e informe PDF.
+
+IMPORTANTE: los minutos de cuidado, UPE y dotación normativa son parámetros editables. Deben surgir de la metodología o normativa aplicable y quedar documentados en la auditoría.

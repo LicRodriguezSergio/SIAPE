@@ -1,0 +1,9 @@
+SIAPE Profesional V2.2
+
+Cambios principales:
+- La calculadora de Recursos Humanos continúa como módulo independiente.
+- El requisito ENF-RH-001 ahora aparece directamente dentro del área Enfermería.
+- Antes del cálculo muestra un acceso visible a la calculadora.
+- Después del cálculo muestra requerido, disponible, déficit, cobertura y riesgo.
+- Si la cobertura es insuficiente, el requisito queda automáticamente como NO y se incorpora a desvíos, resumen, acta, conclusión, plan de mejora e informe PDF.
+- El Motor IA permanece incorporado.

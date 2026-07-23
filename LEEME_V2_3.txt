@@ -1,0 +1,3 @@
+SIAPE Profesional V2.3
+
+Corrección: el botón Abrir calculadora de personal ahora abre directamente el módulo RRHH Enfermería, posiciona la pantalla al inicio y evita depender de la posición del botón en el menú. También muestra un mensaje si la pantalla no pudiera cargarse.
