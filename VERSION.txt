@@ -1,3 +1,6 @@
-SIGAP V3.4.2
-Versión demostrativa: Mapa Prestacional + Derivación y Seguimiento de Desvíos
-Fecha: 04/08/2026
+SIGAP
+Versión de prueba: 3.4.1
+Base: V3.4.0 oficial + Mapa Prestacional demostrativo
+Datos cartográficos: OpenStreetMap
+Datos de prestadores: ficticios para demostración
+Fecha: 2026-08-04

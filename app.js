@@ -682,7 +682,7 @@ function renderReport(){
  <div class="signature">Firma del auditor</div></div>`;
 }
 function renderAll(){ensureState();bindMeta();bindInterview();bindRH();renderRH();renderDashboard();renderAudit();renderSummary();renderDevs();renderNorms();renderReport();renderSavedAudits();if(isManagementRole(currentSessionUser?.role))renderExecutiveDashboard()}
-function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="reportPage")renderReport();if(id==="rrhhPage"){bindRH();renderRH()}if(id==="interviewPage")bindInterview();if(id==="summaryPage"||id==="aiPage")renderSummary();if(id==="aiPage")updateAIConnection();if(id==="executivePage")renderExecutiveDashboard();if(id==="providerMapPage")renderProviderMap();if(id==="followupPage")renderFollowupModule();window.scrollTo({top:0,left:0,behavior:"auto"})}
+function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="reportPage")renderReport();if(id==="rrhhPage"){bindRH();renderRH()}if(id==="interviewPage")bindInterview();if(id==="summaryPage"||id==="aiPage")renderSummary();if(id==="aiPage")updateAIConnection();if(id==="executivePage")renderExecutiveDashboard();if(id==="providerMapPage")renderProviderMap();window.scrollTo({top:0,left:0,behavior:"auto"})}
 function openRHCalculator(){try{const btn=Array.from(document.querySelectorAll(".navbtn")).find(b=>/RRHH Enfermer/i.test(b.textContent||""));showPage("rrhhPage",btn||null);setTimeout(()=>{const first=document.querySelector("#rrhhPage [data-rh]");if(first)first.focus({preventScroll:true});window.scrollTo(0,0)},0)}catch(e){console.error(e);alert("No se pudo abrir la calculadora de Recursos Humanos. Detalle: "+e.message)}}
 function copyText(id){navigator.clipboard.writeText($("#"+id).textContent);alert("Texto copiado")}
 function exportJSON(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="SIAPE_Informe_"+(state.meta.reportNumber||"SN")+"_"+(state.meta.reportYear||"SA")+"_"+(state.meta.prestador||"prestador")+".json";a.click()}
@@ -990,58 +990,11 @@ function showProviderMapDetail(p){
 }
 function resetProviderMapFilters(){['providerMapSearch','providerMapProvince','providerMapComplexity','providerMapRisk'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});renderProviderMapMarkers();if(providerMapInstance)providerMapInstance.setView([-38.4,-63.6],4);document.getElementById('providerMapDetail').innerHTML='<h2>Información del prestador</h2><p class="small">Seleccione un punto del mapa para consultar sus datos.</p>'}
 
-
-// SIGAP V3.4.2 · Demostración de Derivación y Seguimiento
-const FOLLOWUP_DEMO_CASES = [
- {id:'seg-lujan-01',provider:'Clínica Regional de Prueba',province:'Buenos Aires',city:'Luján',auditDate:'04/08/2026',report:'GAP-2026-0048',level:'Internación / II Nivel',capitas:8420,ugl:'UGL XXXII · Luján',deviations:[
-  {id:'ENF-014',area:'Enfermería',service:'Internación',risk:4,deviation:'Los registros de enfermería no contienen valoración integral ni firma identificable en todos los turnos.',recommendation:'Regularizar los registros, asegurar trazabilidad por turno y capacitar al personal.',evidence:'Copia de registros corregidos y acta de capacitación.',deadline:'30 días',status:'pendiente',followupNote:''},
-  {id:'ENF-031',area:'Enfermería',service:'UTI',risk:5,deviation:'El carro de paro se encuentra incompleto y sin control diario documentado.',recommendation:'Completar el carro de paro e implementar control diario con responsable asignado.',evidence:'Planilla de control, fotografías y comprobantes de reposición.',deadline:'10 días',status:'parcial',followupNote:'Se acredita reposición parcial; falta control diario firmado.'},
-  {id:'EST-009',area:'Esterilización',service:'Central de Esterilización',risk:4,deviation:'No se acredita trazabilidad completa de los procesos de esterilización.',recommendation:'Implementar registro integral de carga, ciclo, liberación y destino del material.',evidence:'Registros de tres ciclos completos y procedimiento aprobado.',deadline:'30 días',status:'no_subsanado',followupNote:'No se presentó documentación respaldatoria.'},
-  {id:'LIM-006',area:'Limpieza',service:'Internación',risk:3,deviation:'No existe registro verificable de limpieza terminal de habitaciones.',recommendation:'Implementar planilla de limpieza terminal con fecha, hora y firma.',evidence:'Planillas de los últimos 30 días.',deadline:'45 días',status:'subsanado',followupNote:'Se verifican planillas completas y procedimiento vigente.'},
-  {id:'MED-022',area:'Área Médica',service:'Guardia',risk:4,deviation:'No se acredita protocolo actualizado para la atención inicial de emergencias.',recommendation:'Aprobar, difundir y capacitar sobre protocolo de emergencias.',evidence:'Protocolo firmado, nómina de capacitación y evaluación.',deadline:'30 días',status:'pendiente',followupNote:''}
- ]},
- {id:'seg-rosario-01',provider:'Instituto Asistencial del Litoral',province:'Santa Fe',city:'Rosario',auditDate:'28/07/2026',report:'GAP-2026-0041',level:'Internación / II Nivel',capitas:11120,ugl:'UGL IX · Rosario',deviations:[
-  {id:'LAB-011',area:'Laboratorio',service:'Laboratorio',risk:4,deviation:'No se evidencia control documentado de temperaturas en equipos críticos.',recommendation:'Implementar control diario, límites de aceptación y acciones ante desvíos.',evidence:'Registros de 30 días y certificados de calibración.',deadline:'20 días',status:'pendiente',followupNote:''},
-  {id:'NUT-008',area:'Nutrición',service:'Nutrición',risk:3,deviation:'No se acredita evaluación nutricional oportuna en todos los pacientes internados.',recommendation:'Establecer tamizaje al ingreso y seguimiento según riesgo.',evidence:'Historias clínicas y protocolo de tamizaje.',deadline:'45 días',status:'parcial',followupNote:'Se inició implementación, resta cobertura completa.'}
- ]}
-];
-const FOLLOWUP_STATUS_LABELS={pendiente:'Pendiente',parcial:'Parcialmente subsanado',subsanado:'Subsanado',no_subsanado:'No subsanado'};
-let followupDemoState=JSON.parse(localStorage.getItem('sigap_followup_demo')||'null')||structuredClone(FOLLOWUP_DEMO_CASES);
-function saveFollowupDemo(){localStorage.setItem('sigap_followup_demo',JSON.stringify(followupDemoState))}
-function currentFollowupCase(){const id=document.getElementById('followupProvider')?.value;return followupDemoState.find(x=>x.id===id)||followupDemoState[0]}
-function followupFiltered(caseData){const area=document.getElementById('followupArea')?.value||'',status=document.getElementById('followupStatus')?.value||'';return caseData.deviations.filter(d=>(!area||d.area===area)&&(!status||d.status===status))}
-function renderFollowupModule(){
- const provider=document.getElementById('followupProvider');if(!provider)return;
- if(!provider.options.length)followupDemoState.forEach(c=>provider.add(new Option(`${c.provider} · ${c.city}`,c.id)));
- const c=currentFollowupCase();
- const area=document.getElementById('followupArea');const previous=area.value;area.innerHTML='<option value="">Todas las áreas</option>';[...new Set(c.deviations.map(d=>d.area))].sort().forEach(v=>area.add(new Option(v,v)));if([...area.options].some(o=>o.value===previous))area.value=previous;
- const ugl=document.getElementById('followupUGL');if(ugl&&[...ugl.options].some(o=>o.value===c.ugl))ugl.value=c.ugl;
- updateFollowupHeader();renderFollowupItems(c);renderFollowupKpis(c);renderFollowupSummary(c);
-}
-function updateFollowupHeader(){const c=currentFollowupCase();if(!c)return;const dest=document.getElementById('followupUGL')?.value||c.ugl;const el=document.getElementById('followupHeader');if(el)el.innerHTML=`<div><span class="viz-badge">EXPEDIENTE DE SEGUIMIENTO</span><h2>${esc(c.provider)}</h2><p><b>${esc(c.city)}, ${esc(c.province)}</b> · ${esc(c.level)} · ${c.capitas.toLocaleString('es-AR')} cápitas</p><p>Informe de origen: <b>${esc(c.report)}</b> · Auditoría: ${esc(c.auditDate)} · Destino: <b>${esc(dest)}</b></p></div>`}
-function renderFollowupKpis(c){const ds=c.deviations;const el=document.getElementById('followupKpis');if(!el)return;el.innerHTML=[
- `<div class="kpi"><b>${ds.length}</b><span>Desvíos derivados</span></div>`,
- `<div class="kpi"><b>${ds.filter(d=>d.risk>=4).length}</b><span>Riesgo alto o crítico</span></div>`,
- `<div class="kpi"><b>${ds.filter(d=>d.status==='subsanado').length}</b><span>Subsanados</span></div>`,
- `<div class="kpi"><b>${Math.round(ds.filter(d=>d.status==='subsanado').length/Math.max(1,ds.length)*100)}%</b><span>Cumplimiento verificado</span></div>`
- ].join('')}
-function renderFollowupItems(c){const items=followupFiltered(c),host=document.getElementById('followupAreaGroups');if(!host)return;const groups={};items.forEach(d=>(groups[d.area]??=[]).push(d));host.innerHTML=Object.keys(groups).length?Object.entries(groups).map(([area,ds])=>`<section class="card followup-area"><div class="followup-area-head"><div><h2>${esc(area)}</h2><p>${ds.length} desvío${ds.length===1?'':'s'} para verificar</p></div><span class="iirs-badge ${ds.some(d=>d.risk>=4)?'iirs-rojo':'iirs-amarillo'}">Riesgo máximo ${Math.max(...ds.map(d=>d.risk))}</span></div>${ds.map(d=>followupItemHtml(c,d)).join('')}</section>`).join(''):'<div class="card"><p>No hay desvíos para los filtros seleccionados.</p></div>'}
-function followupItemHtml(c,d){return `<article class="followup-item followup-${d.status}"><div class="followup-item-head"><div><b>${esc(d.id)} · ${esc(d.service)}</b><div class="small">Riesgo ${d.risk} · Plazo ${esc(d.deadline)}</div></div><span class="followup-status status-${d.status}">${FOLLOWUP_STATUS_LABELS[d.status]}</span></div><p><b>Desvío:</b> ${esc(d.deviation)}</p><p><b>Recomendación:</b> ${esc(d.recommendation)}</p><p><b>Evidencia solicitada:</b> ${esc(d.evidence)}</p><div class="grid followup-controls"><div><label>Resultado del seguimiento</label><select data-case="${c.id}" data-dev="${d.id}" class="followup-state-select"><option value="pendiente" ${d.status==='pendiente'?'selected':''}>Pendiente</option><option value="parcial" ${d.status==='parcial'?'selected':''}>Parcialmente subsanado</option><option value="subsanado" ${d.status==='subsanado'?'selected':''}>Subsanado</option><option value="no_subsanado" ${d.status==='no_subsanado'?'selected':''}>No subsanado</option></select></div><div><label>Observación del auditor de seguimiento</label><textarea data-case="${c.id}" data-dev="${d.id}" class="followup-note" rows="2" placeholder="Describa la verificación realizada...">${esc(d.followupNote||'')}</textarea></div></div></article>`}
-function bindFollowupControls(){document.querySelectorAll('.followup-state-select').forEach(el=>el.onchange=()=>updateFollowupDeviation(el.dataset.case,el.dataset.dev,'status',el.value));document.querySelectorAll('.followup-note').forEach(el=>el.onchange=()=>updateFollowupDeviation(el.dataset.case,el.dataset.dev,'followupNote',el.value))}
-const _renderFollowupItems=renderFollowupItems;renderFollowupItems=function(c){_renderFollowupItems(c);bindFollowupControls()}
-function updateFollowupDeviation(caseId,devId,key,value){const c=followupDemoState.find(x=>x.id===caseId),d=c?.deviations.find(x=>x.id===devId);if(!d)return;d[key]=value;saveFollowupDemo();renderFollowupModule()}
-function renderFollowupSummary(c){const ds=c.deviations,total=ds.length,sub=ds.filter(d=>d.status==='subsanado').length,par=ds.filter(d=>d.status==='parcial').length,pend=ds.filter(d=>d.status==='pendiente'||d.status==='no_subsanado').length;const byArea=[...new Set(ds.map(d=>d.area))].map(a=>`${a}: ${ds.filter(d=>d.area===a).length}`).join('<br>');const el=document.getElementById('followupSummary');if(el)el.innerHTML=`<dl class="provider-detail-list"><div><dt>Informe</dt><dd>${esc(c.report)}</dd></div><div><dt>Total</dt><dd>${total}</dd></div><div><dt>Subsanados</dt><dd>${sub}</dd></div><div><dt>Parciales</dt><dd>${par}</dd></div><div><dt>Pendientes</dt><dd>${pend}</dd></div><div><dt>Cumplimiento</dt><dd>${Math.round(sub/Math.max(1,total)*100)}%</dd></div></dl><h3>Distribución por área</h3><p>${byArea}</p>`}
-function generateFollowupReferral(){const c=currentFollowupCase(),dest=document.getElementById('followupUGL')?.value||c.ugl;alert(`Derivación demostrativa generada para ${dest}.\n\nEn la versión definitiva se creará un expediente con los desvíos agrupados por área y el informe de origen adjunto.`)}
-function copyFollowupSummary(){const c=currentFollowupCase(),ds=c.deviations,dest=document.getElementById('followupUGL')?.value||c.ugl;const text=`SIGAP · DERIVACIÓN A SEGUIMIENTO\nPrestador: ${c.provider}\nInforme: ${c.report}\nDestino: ${dest}\nDesvíos: ${ds.length}\nSubsanados: ${ds.filter(d=>d.status==='subsanado').length}\nPendientes: ${ds.filter(d=>d.status!=='subsanado').length}\n\n${ds.map(d=>`${d.area} · ${d.id} · Riesgo ${d.risk} · ${FOLLOWUP_STATUS_LABELS[d.status]}\n${d.deviation}`).join('\n\n')}`;navigator.clipboard?.writeText(text).then(()=>alert('Resumen copiado.')).catch(()=>prompt('Copie el resumen:',text))}
-function printFollowupPackage(){window.print()}
-function resetFollowupDemo(){if(!confirm('¿Restablecer los datos demostrativos de seguimiento?'))return;followupDemoState=structuredClone(FOLLOWUP_DEMO_CASES);saveFollowupDemo();document.getElementById('followupProvider').innerHTML='';renderFollowupModule()}
-
 function lockApplication(){
  document.getElementById('authGate')?.classList.remove('hide','auth-success');document.body.classList.add('locked');
  document.getElementById('adminNav')?.classList.add('hide');
  document.getElementById('executiveNav')?.classList.add('hide');
  document.getElementById('providerMapNav')?.classList.add('hide');
- document.getElementById('followupNav')?.classList.add('hide');
 }
 function unlockApplication(){
  const gate=document.getElementById('authGate');gate?.classList.add('auth-success');
@@ -1050,7 +1003,6 @@ function unlockApplication(){
  document.getElementById('adminNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
  document.getElementById('executiveNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
  document.getElementById('providerMapNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
- document.getElementById('followupNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
  applyProfileToAudit();renderUserDashboard();
 }
 async function siapeLogin(){
