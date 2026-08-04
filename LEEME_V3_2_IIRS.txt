@@ -1,0 +1,10 @@
+SIAPE V3.2 – Índice Integral de Riesgo SIAPE (IIRS)
+
+Cambios:
+- IIRS general de 0 a 5.
+- IIRS por área.
+- Escala: 0 Excelente, 1 Muy bueno, 2 Bueno, 3 Moderado, 4 Muy malo, 5 Crítico.
+- Orden local de prestadores utilizando la auditoría guardada más reciente.
+- No se modificaron login, usuarios, formularios ni Motor IA.
+
+Cálculo: requisitos SI = 0; requisitos NO = score de riesgo del ítem; NA y no respondidos se excluyen.

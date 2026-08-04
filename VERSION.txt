@@ -1,0 +1,4 @@
+SIAPE GAP
+Versión oficial: 3.4.0
+Base consolidada: Login + Administración + IIRS + Ranking + Tablero Ejecutivo
+Fecha: 2026-08-04

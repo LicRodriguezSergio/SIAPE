@@ -1,0 +1,4 @@
+SIAPE V3.3.0
+Tablero Ejecutivo local para roles de gestión.
+Resume auditorías guardadas en este dispositivo: IIRS promedio, áreas de riesgo, prestadores, evolución mensual y actividad por auditor.
+No sincroniza auditorías ni datos sensibles con la nube.

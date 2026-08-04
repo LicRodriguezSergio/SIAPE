@@ -41,3 +41,57 @@ table{width:100%;border-collapse:collapse;background:white;font-size:13px}th,td{
 
 .interview-intro{border-left:6px solid var(--blue);background:linear-gradient(135deg,#fff,#eef7fb)}
 .large-notes{min-height:170px;margin-bottom:14px}.interview-options{padding:10px 0 14px}.checkline{display:flex;align-items:center;gap:9px;font-size:14px}.checkline input{width:auto}.autosave-note{margin-top:8px}.interview-report-text{white-space:pre-wrap;line-height:1.55;border:1px solid var(--line);padding:10px;border-radius:6px;margin-bottom:12px}
+
+/* SIAPE V3: conserva el diseño original y suma seguridad/evidencias */
+.auth-gate{position:fixed;inset:0;background:linear-gradient(135deg,#123d5a,#176b8f);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}.auth-card{background:white;width:min(440px,100%);padding:28px;border-radius:14px;box-shadow:0 20px 60px #0006}.auth-card h1{margin:0;color:var(--nav)}.auth-card p{margin-top:5px}.auth-card label{margin-top:14px}.auth-main{width:100%;margin-top:12px}.locked>header,.locked>main{filter:blur(3px);pointer-events:none}.session-bar{display:flex;justify-content:flex-end;align-items:center;gap:8px;font-size:12px}.session-btn{border:1px solid #ffffff66;background:#ffffff18;color:white;border-radius:5px;padding:5px 8px}.welcome-user{margin-bottom:15px}.photo-tools{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.photo-button{display:inline-flex;align-items:center;margin:0}.photo-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.photo-thumb{position:relative;width:105px;height:80px}.photo-thumb img{width:100%;height:100%;object-fit:cover;border-radius:7px;border:1px solid var(--line)}.photo-thumb button{position:absolute;right:3px;top:3px;padding:2px 7px;border-radius:50%}.report-photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.report-photo-grid figure{margin:0;page-break-inside:avoid}.report-photo-grid img{width:100%;max-height:360px;object-fit:contain;border:1px solid #aaa}.report-photo-grid figcaption{font-size:11px;margin-top:5px}.photo-report{page-break-before:always}@media(max-width:650px){.report-photo-grid{grid-template-columns:1fr}}
+
+
+/* SIAPE V3.1 - identidad institucional y transición de acceso */
+.auth-gate{overflow:hidden;background:linear-gradient(135deg,#eef7fb 0%,#ffffff 50%,#e8f3f8 100%)}
+.auth-gate::before{content:"";position:absolute;inset:0;background:url('pami-logo.png') center/52% auto no-repeat;opacity:.045;pointer-events:none}
+.login-intro{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:white;transition:opacity .45s ease,transform .45s ease}
+.login-intro img{width:min(310px,68vw);filter:drop-shadow(0 8px 18px #1232)}
+.login-intro strong{font-size:34px;color:var(--nav);letter-spacing:.04em}
+.login-intro span{font-size:17px;color:#24566f;text-align:center;padding:0 18px}
+.login-intro-out{opacity:0;transform:scale(1.025);pointer-events:none}
+.auth-card{position:relative;z-index:3;text-align:left;transition:opacity .45s ease,transform .45s ease;max-height:94vh;overflow:auto}
+.auth-card-hidden{opacity:0;transform:translateY(14px);pointer-events:none}
+.auth-logo{display:block;width:178px;max-width:58%;margin:0 auto 12px}
+.auth-card h1{text-align:center;font-size:31px;margin-bottom:4px}
+.auth-subtitle{text-align:center;font-size:16px;font-weight:700;color:#155b7c;margin:0}
+.auth-area{text-align:center;color:#526f7d;margin:6px 0 20px}
+.login-status{min-height:20px;margin-top:10px;color:#9b231a;text-align:center;font-weight:700}
+.auth-credit{border-top:1px solid var(--line);margin-top:18px;padding-top:14px;text-align:center;font-size:12px;line-height:1.55;color:#36515f}
+.auth-success{opacity:0;transition:opacity .5s ease;pointer-events:none}
+.app-watermark{position:fixed;inset:0;z-index:-1;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden}
+.app-watermark img{width:min(620px,64vw);opacity:.035}
+body:not(.locked) main,body:not(.locked) header{animation:siapeEnter .5s ease both}
+@keyframes siapeEnter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(max-width:560px){.auth-card{padding:22px 18px}.login-intro strong{font-size:28px}.login-intro span{font-size:15px}.app-watermark img{width:88vw}}
+
+/* SIAPE V3.1.4 - Solicitud y administración de usuarios */
+.access-request{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:9px;background:#f7fbfd}
+.access-request h3{margin:0 0 8px;color:var(--nav)}
+.admin-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) 180px auto;gap:10px;align-items:end;margin-bottom:12px}
+.admin-users{display:grid;gap:10px;margin-top:12px}
+.admin-user-card{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff}
+.admin-user-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.admin-user-name{font-weight:700;font-size:16px;color:var(--nav)}
+.admin-user-meta{font-size:12px;color:#526f7d;line-height:1.5}
+.admin-user-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.user-state{display:inline-block;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase}
+.user-state-pendiente{background:#fff3cd;color:#795c00}.user-state-autorizado{background:#d8f3df;color:#145c2c}.user-state-suspendido{background:#fde2e2;color:#8b1e1e}.user-state-rechazado{background:#ececec;color:#555}
+.role-editor{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:10px}.role-editor select{width:auto;min-width:180px}
+@media(max-width:700px){.admin-toolbar{grid-template-columns:1fr}.admin-toolbar button{width:100%}}
+
+
+/* SIAPE V3.2 · Índice Integral de Riesgo SIAPE */
+.iirs-overall{margin-top:10px;font-size:.88em;font-weight:600}
+.iirs-badge{display:inline-block;padding:5px 10px;border-radius:999px;font-size:.82rem;font-weight:800;white-space:nowrap;border:1px solid transparent}
+.iirs-verde{background:#e7f6ec;color:#176b36;border-color:#b9e2c5}
+.iirs-amarillo{background:#fff5cf;color:#755800;border-color:#ead879}
+.iirs-rojo{background:#fde8e8;color:#a32121;border-color:#efb3b3}
+.iirs-sin{background:#eef2f5;color:#59636b;border-color:#d4dbe0}
+
+/* SIAPE V3.3 · Tablero Ejecutivo */
+.executive-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.executive-head h2{margin-top:0}.executive-kpis{margin-bottom:16px}.executive-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}.exec-bars{display:grid;gap:13px;margin-top:8px}.exec-bar-label{display:flex;justify-content:space-between;gap:10px;font-size:13px}.exec-bar-track{height:14px;background:#e8eef2;border-radius:999px;overflow:hidden;margin-top:5px}.exec-bar-fill{display:block;height:100%;border-radius:999px;background:#25759a;transition:width .25s ease}.exec-green{background:#2d9d58}.exec-yellow{background:#d5a91d}.exec-red{background:#c43a34}.exec-blue{background:#287fa8}@media(max-width:850px){.executive-grid{grid-template-columns:1fr}.executive-head{display:block}}

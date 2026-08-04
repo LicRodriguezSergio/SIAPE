@@ -209,6 +209,136 @@ function stats(){
  return {active:active.length,answered:answered.length,dev:dev.length,high:dev.filter(i=>i.score>=4).length,mod:dev.filter(i=>i.score===3).length,low:dev.filter(i=>i.score<=2).length,compliance:(yes+(answered.filter(i=>answerFor(i.code).response==="NA").length?0:0))/(answered.filter(i=>answerFor(i.code).response!=="NA").length||1)};
 }
 function riskOverall(){let s=stats();return s.high>0?"ROJO - NIVEL ALTO":s.mod>0?"AMARILLO - NIVEL MODERADO":s.dev>0?"VERDE - NIVEL BAJO":"SIN DESVÍOS REGISTRADOS"}
+
+// Índice Integral de Riesgo SIAPE (IIRS).
+// Cada requisito respondido SI vale 0; cada NO conserva el riesgo propio del ítem (0 a 5).
+// NA y requisitos sin responder no intervienen en el cálculo.
+function iirsBand(value){
+ const v=Math.max(0,Math.min(5,Number(value)||0));
+ const level=Math.max(0,Math.min(5,Math.round(v)));
+ const labels=["EXCELENTE","MUY BUENO","BUENO","MODERADO","MUY MALO","CRÍTICO"];
+ const color=level<=2?"verde":level===3?"amarillo":"rojo";
+ return {level,label:labels[level],color};
+}
+function iirsForItems(items,getAnswer){
+ const evaluated=items.filter(i=>["SI","NO"].includes((getAnswer(i.code)||{}).response));
+ if(!evaluated.length)return {value:null,evaluated:0,deviations:0,band:null};
+ const total=evaluated.reduce((sum,i)=>sum+((getAnswer(i.code)||{}).response==="NO"?Math.max(0,Math.min(5,Number(i.score)||0)):0),0);
+ const value=total/evaluated.length;
+ return {value,evaluated:evaluated.length,deviations:evaluated.filter(i=>(getAnswer(i.code)||{}).response==="NO").length,band:iirsBand(value)};
+}
+function currentIIRS(service){
+ const items=activeItems().filter(i=>!service||i.service===service);
+ return iirsForItems(items,answerFor);
+}
+function snapshotIIRS(snapshot,service){
+ const st=snapshot?.state||snapshot;
+ if(!st)return {value:null,evaluated:0,deviations:0,band:null};
+ const level=st.meta?.level||"III";
+ const enabled=st.enabled||{};
+ const items=ITEMS.filter(i=>(enabled[i.service]!==false)&&String(i.levels||"").includes(level)&&(!service||i.service===service));
+ const getAnswer=code=>st.answers?.[code]||{response:""};
+ return iirsForItems(items,getAnswer);
+}
+function formatIIRS(x){return x?.value==null?"—":x.value.toFixed(2)}
+function iirsBadge(x){
+ if(!x||x.value==null)return '<span class="iirs-badge iirs-sin">SIN DATOS</span>';
+ return `<span class="iirs-badge iirs-${x.band.color}">${formatIIRS(x)} · ${esc(x.band.label)}</span>`;
+}
+function renderProviderRanking(){
+ const body=document.getElementById("providerRankingRows"),note=document.getElementById("providerRankingNote");
+ if(!body)return;
+ const lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");
+ const latest={};
+ Object.entries(lib).forEach(([id,snap])=>{
+  const name=String(snap?.state?.meta?.prestador||"").trim();if(!name)return;
+  const key=name.toLocaleLowerCase('es');
+  if(!latest[key]||String(snap.savedAt||"")>String(latest[key].savedAt||""))latest[key]={...snap,_id:id};
+ });
+ const rows=Object.values(latest).map(snap=>{
+  const idx=snapshotIIRS(snap),m=snap.state?.meta||{};
+  const areas=services.filter(sv=>snap.state?.enabled?.[sv]!==false&&ITEMS.some(i=>i.service===sv&&String(i.levels||"").includes(m.level||"III"))).length;
+  return {name:m.prestador||"Prestador",level:m.level||"—",date:m.date||"—",areas,index:idx};
+ }).filter(x=>x.index.value!=null).sort((a,b)=>a.index.value-b.index.value||a.name.localeCompare(b.name,'es'));
+ body.innerHTML=rows.length?rows.map((x,n)=>`<tr><td>${n+1}</td><td>${esc(x.name)}</td><td>${esc(x.level)}</td><td>${esc(x.date)}</td><td>${x.areas}</td><td>${iirsBadge(x.index)}</td></tr>`).join(""):'<tr><td colspan="6">Todavía no hay auditorías guardadas con respuestas suficientes para calcular el índice.</td></tr>';
+ if(note)note.textContent="Orden local de menor a mayor riesgo. Se utiliza la auditoría guardada más reciente de cada prestador y se informa la cantidad de áreas evaluadas para evitar comparaciones descontextualizadas.";
+}
+
+function localExecutiveAudits(){
+ const lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");
+ return Object.entries(lib).map(([id,snap])=>{
+  const st=snap?.state||{},m=st.meta||{},idx=snapshotIIRS(snap);
+  return {id,snap,state:st,meta:m,index:idx,savedAt:snap.savedAt||""};
+ }).filter(x=>x.index.value!=null);
+}
+function latestExecutiveProviders(rows){
+ const latest={};
+ rows.forEach(x=>{
+  const name=String(x.meta.prestador||"").trim();if(!name)return;
+  const key=name.toLocaleLowerCase('es');
+  if(!latest[key]||String(x.savedAt)>String(latest[key].savedAt))latest[key]=x;
+ });
+ return Object.values(latest);
+}
+function executiveBandKey(index){
+ if(!index||index.value==null)return 'sin';
+ const level=iirsBand(index.value).level;
+ return level<=2?'verde':level===3?'amarillo':'rojo';
+}
+function renderExecBars(target,items,formatter){
+ const el=document.getElementById(target);if(!el)return;
+ const max=Math.max(1,...items.map(x=>Number(x.value)||0));
+ el.innerHTML=items.length?items.map(x=>`<div class="exec-bar-row"><div class="exec-bar-label"><span>${esc(x.label)}</span><b>${esc(formatter?formatter(x):x.value)}</b></div><div class="exec-bar-track"><span class="exec-bar-fill ${x.color||''}" style="width:${Math.max(2,(Number(x.value)||0)/max*100)}%"></span></div></div>`).join(''):'<div class="small">Sin datos suficientes.</div>';
+}
+function renderExecutiveDashboard(){
+ const allowed=isManagementRole(currentSessionUser?.role);
+ if(!allowed){alert('Esta pantalla está reservada a los roles de gestión.');return}
+ const audits=localExecutiveAudits(),providers=latestExecutiveProviders(audits);
+ const avg=audits.length?audits.reduce((a,x)=>a+x.index.value,0)/audits.length:null;
+ const uniqueProviders=new Set(audits.map(x=>String(x.meta.prestador||'').trim().toLowerCase()).filter(Boolean)).size;
+ const redProviders=providers.filter(x=>executiveBandKey(x.index)==='rojo').length;
+ const highDeviations=audits.reduce((sum,x)=>sum+ITEMS.filter(i=>{
+  const a=x.state.answers?.[i.code];return a?.response==='NO'&&Number(i.score)>=4;
+ }).length,0);
+ const k=document.getElementById('executiveKpis');if(k)k.innerHTML=[
+  ['Auditorías guardadas',audits.length],['Prestadores',uniqueProviders],['IIRS promedio',avg==null?'—':avg.toFixed(2)],['Prestadores en rojo',redProviders],['Desvíos altos/críticos',highDeviations]
+ ].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+
+ const areaRows=services.map(service=>{
+  const vals=audits.map(x=>snapshotIIRS(x.snap,service)).filter(x=>x.value!=null);
+  if(!vals.length)return null;
+  const average=vals.reduce((a,x)=>a+x.value,0)/vals.length,maxv=Math.max(...vals.map(x=>x.value));
+  return {service,count:vals.length,average,maxv,index:{value:average,band:iirsBand(average)}};
+ }).filter(Boolean).sort((a,b)=>b.average-a.average);
+ const areaBody=document.getElementById('executiveAreaRows');if(areaBody)areaBody.innerHTML=areaRows.length?areaRows.map(x=>`<tr><td>${esc(x.service)}</td><td>${x.count}</td><td>${x.average.toFixed(2)}</td><td>${x.maxv.toFixed(2)}</td><td>${iirsBadge(x.index)}</td></tr>`).join(''):'<tr><td colspan="5">Sin datos suficientes.</td></tr>';
+
+ const bandCounts={verde:0,amarillo:0,rojo:0};providers.forEach(x=>bandCounts[executiveBandKey(x.index)]++);
+ renderExecBars('executiveBandBars',[
+  {label:'Verde · Excelente/Muy bueno/Bueno',value:bandCounts.verde,color:'exec-green'},
+  {label:'Amarillo · Moderado',value:bandCounts.amarillo,color:'exec-yellow'},
+  {label:'Rojo · Muy malo/Crítico',value:bandCounts.rojo,color:'exec-red'}
+ ],x=>String(x.value));
+
+ const ordered=[...providers].sort((a,b)=>b.index.value-a.index.value||String(a.meta.prestador).localeCompare(String(b.meta.prestador),'es'));
+ const rowHtml=x=>`<tr><td>${esc(x.meta.prestador||'Prestador')}</td><td>${esc(x.meta.level||'—')}</td><td>${esc(x.meta.date||'—')}</td><td>${iirsBadge(x.index)}</td></tr>`;
+ const riskBody=document.getElementById('executiveRiskRows');if(riskBody)riskBody.innerHTML=ordered.length?ordered.slice(0,10).map(rowHtml).join(''):'<tr><td colspan="4">Sin datos suficientes.</td></tr>';
+ const bestBody=document.getElementById('executiveBestRows');if(bestBody)bestBody.innerHTML=ordered.length?[...ordered].reverse().slice(0,10).map(rowHtml).join(''):'<tr><td colspan="4">Sin datos suficientes.</td></tr>';
+
+ const months={};audits.forEach(x=>{
+  const raw=String(x.meta.date||x.savedAt||'').slice(0,7);if(!/^\d{4}-\d{2}$/.test(raw))return;
+  (months[raw]||(months[raw]=[])).push(x.index.value);
+ });
+ const monthItems=Object.keys(months).sort().slice(-12).map(m=>({label:m,value:months[m].reduce((a,v)=>a+v,0)/months[m].length,color:'exec-blue'}));
+ renderExecBars('executiveTrend',monthItems,x=>x.value.toFixed(2));
+
+ const byAuditor={};audits.forEach(x=>{
+  const name=String(x.meta.auditor||'Sin identificar').trim()||'Sin identificar';
+  const e=byAuditor[name]||(byAuditor[name]={name,count:0,providers:new Set(),sum:0});e.count++;e.sum+=x.index.value;if(x.meta.prestador)e.providers.add(String(x.meta.prestador).trim().toLowerCase());
+ });
+ const auditorRows=Object.values(byAuditor).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'es'));
+ const auditorBody=document.getElementById('executiveAuditorRows');if(auditorBody)auditorBody.innerHTML=auditorRows.length?auditorRows.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.count}</td><td>${x.providers.size}</td><td>${(x.sum/x.count).toFixed(2)}</td></tr>`).join(''):'<tr><td colspan="4">Sin datos suficientes.</td></tr>';
+}
+
 function selectedServices(){return services.filter(s=>state.enabled[s])}
 function servicesWithDeviations(){return services.filter(s=>deviations().some(i=>i.service===s))}
 function reportId(){let n=String(state.meta.reportNumber||"").trim(),y=String(state.meta.reportYear||"").trim();return n&&y?`${n}/${y}`:n||y||"SIN NÚMERO"}
@@ -399,10 +529,12 @@ function renderAudit(){
    <div class="audit-head"><div><div class="itemtitle">${esc(i.code)} · ${esc(i.item)}</div><div class="meta">${esc(i.service)} · ${esc(i.domain)} · Niveles ${esc(i.levels)} · <span class="badge b${i.score}">${esc(i.criticality||riskLabel(i.score))} · ${i.score}</span></div></div></div>
    <div class="responses">${["SI","NO","NA","NO EVALUADO"].map(r=>`<button class="resp ${a.response===r?"sel":""}" onclick="setResp('${i.code}','${r}')">${r==="NA"?"NO APLICA":r}</button>`).join("")}</div>
    <label>Observación y evidencia</label><textarea oninput="setObs('${i.code}',this.value)" placeholder="Describa lo observado, documentos revisados, entrevistas y evidencia directa...">${esc(a.obs)}</textarea>
+   <div class="photo-tools no-print"><label class="secondary photo-button">📷 Tomar foto<input class="hide" type="file" accept="image/*" capture="environment" onchange="addEvidencePhotos('${i.code}',this.files)"></label><label class="secondary photo-button">🖼 Elegir fotos<input class="hide" type="file" accept="image/*" multiple onchange="addEvidencePhotos('${i.code}',this.files)"></label><button class="secondary" onclick="openEvidenceGallery('${i.code}')">Ver fotos <span id="photo-count-${i.code}">0</span></button></div><div id="photo-preview-${i.code}" class="photo-preview"></div>
    ${a.response==="NO"?`<div class="detail"><h4>Desvío</h4><div>${esc(tech.deviation)}</div><h4>Fundamentación técnica</h4><div>${esc(tech.why)}</div><h4>Recomendación</h4><div>${esc(tech.rec)}</div><h4>Evidencia esperada</h4><div>${esc(tech.ev)}</div><h4>Responsable</h4><div>${esc(tech.resp)}</div><h4>Plazo</h4><div>${esc(tech.plazo)}</div><h4>Marco normativo</h4><div>${esc(normText(i.service))}</div></div>`:""}
   </div>`;
  }).join("");
  $("#auditList").innerHTML=rhBlock+normalCards||'<div class="notice">No hay requisitos aplicables con los filtros seleccionados.</div>';
+ refreshVisiblePhotoCounts();
 }
 function setResp(code,r){state.answers[code]={...answerFor(code),response:r};save();renderAll()}
 function setObs(code,v){state.answers[code]={...answerFor(code),obs:v};save()}
@@ -427,16 +559,17 @@ function normText(service){
  return parts.join(" ");
 }
 function renderDashboard(){
- let s=stats();
+ let s=stats(),general=currentIIRS();
  $("#kpis").innerHTML=[
- ["Ítems aplicables",s.active],["Respondidos",s.answered],["Desvíos",s.dev],["Riesgo alto",s.high],["Cumplimiento",(s.compliance*100).toFixed(1)+"%"]
+ ["Ítems aplicables",s.active],["Respondidos",s.answered],["Desvíos",s.dev],["Riesgo alto",s.high],["Cumplimiento",(s.compliance*100).toFixed(1)+"%"],["IIRS general",formatIIRS(general)]
  ].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
- $("#overall").textContent=riskOverall();
+ $("#overall").innerHTML=`${esc(riskOverall())}<div class="iirs-overall">Índice Integral de Riesgo SIAPE: ${iirsBadge(general)}</div>`;
  $("#serviceTable").innerHTML=services.filter(x=>state.enabled[x]).map(sv=>{
-  let arr=ITEMS.filter(i=>i.service===sv&&applicable(i)), ds=arr.filter(i=>answerFor(i.code).response==="NO");
-  let ans=arr.filter(i=>["SI","NO"].includes(answerFor(i.code).response)), yes=ans.filter(i=>answerFor(i.code).response==="SI").length;
-  return `<tr><td>${sv}</td><td>${arr.length}</td><td>${ds.length}</td><td>${ans.length?(yes/ans.length*100).toFixed(1):"0.0"}%</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${ds.some(i=>i.score>=4)?"ROJO - ALTO":ds.some(i=>i.score===3)?"AMARILLO - MODERADO":ds.length?"VERDE - BAJO":"SIN DESVÍOS"}</td></tr>`
+  let arr=activeItems().filter(i=>i.service===sv), ds=arr.filter(i=>answerFor(i.code).response==="NO");
+  let ans=arr.filter(i=>["SI","NO"].includes(answerFor(i.code).response)), yes=ans.filter(i=>answerFor(i.code).response==="SI").length,idx=currentIIRS(sv);
+  return `<tr><td>${sv}</td><td>${arr.length}</td><td>${ds.length}</td><td>${ans.length?(yes/ans.length*100).toFixed(1):"0.0"}%</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${iirsBadge(idx)}</td></tr>`
  }).join("");
+ renderProviderRanking();
 }
 function renderSummary(){
  $("#execText").textContent=(state.ai&&state.ai.executive)||executive();$("#actText").textContent=(state.ai&&state.ai.act)||actSummary();
@@ -522,10 +655,10 @@ function renderSavedAudits(){
  let count=$("#savedAuditCount");if(count)count.textContent=query?`${arr.length} de ${all.length} auditorías encontradas`:`${all.length} auditorías guardadas`;
  if(!all.length){el.innerHTML='<div class="notice">Todavía no hay auditorías guardadas mediante el botón 💾.</div>';return}
  if(!arr.length){el.innerHTML='<div class="notice">No se encontraron auditorías que coincidan con la búsqueda.</div>';return}
- el.innerHTML=arr.map(([id,x])=>{let m=x.state?.meta||{};return `<div class="saved-item"><div><strong>Informe ${esc(m.reportNumber||"S/N")}/${esc(m.reportYear||"")} · ${esc(m.prestador||"Prestador sin identificar")}</strong><div class="small">CUIT: ${esc(m.cuit||"Sin informar")} · Auditoría: ${esc(m.date||"Sin fecha")} · Jurisdicción: ${esc(m.province||"Sin informar")}</div><div class="small">Guardado: ${esc(new Date(x.savedAt).toLocaleString())} · ${Object.keys(x.state?.answers||{}).length} respuestas registradas</div></div><div class="saved-actions"><button class="secondary" onclick="loadAuditSnapshot('${id}')">Abrir / continuar</button><button class="danger" onclick="deleteAuditSnapshot('${id}')">Eliminar</button></div></div>`}).join("");
+ el.innerHTML=arr.map(([id,x])=>{let m=x.state?.meta||{};return `<div class="saved-item"><div><strong>Informe ${esc(m.reportNumber||"S/N")}/${esc(m.reportYear||"")} · ${esc(m.prestador||"Prestador sin identificar")}</strong><div class="small">CUIT: ${esc(m.cuit||"Sin informar")} · Auditoría: ${esc(m.date||"Sin fecha")} · Jurisdicción: ${esc(m.province||"Sin informar")}</div><div class="small">Guardado: ${esc(new Date(x.savedAt).toLocaleString())} · ${Object.keys(x.state?.answers||{}).length} respuestas registradas</div></div><div class="saved-actions"><button class="secondary" onclick="loadAuditSnapshot('${id}')">Abrir / continuar</button><button class="secondary" onclick="shareSavedAudit('${id}')">Compartir</button><button class="danger" onclick="deleteAuditSnapshot('${id}')">Eliminar</button></div></div>`}).join("");
 }
 function saveAuditSnapshot(){
- save();let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");let id=base.toLowerCase();lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits();alert(`Auditoría ${reportId()} guardada en este dispositivo.`)
+ save();let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");let id=base.toLowerCase();lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits();renderProviderRanking();alert(`Auditoría ${reportId()} guardada en este dispositivo.`)
 }
 function loadAuditSnapshot(id){let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");if(!lib[id])return;state=JSON.parse(JSON.stringify(lib[id].state));ensureState();save();renderAll();alert(`Auditoría ${reportId()} abierta.`)}
 function deleteAuditSnapshot(id){if(!confirm("¿Eliminar esta auditoría guardada del dispositivo?"))return;let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");delete lib[id];localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits()}
@@ -542,14 +675,14 @@ function renderReport(){
  <section class="report-section"><h1>2. RESUMEN EJECUTIVO</h1><p>${esc(executive())}</p>${bullets.length?`<p>En tal sentido se verificó:</p><ul class="red-list">${bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}<p>La evaluación comprendió ${s.active} requisitos aplicables. Se registraron ${s.dev} desvíos, de los cuales ${s.high} son altos o críticos y ${s.mod} moderados. El detalle se encuentra en el Anexo Técnico Operativo.</p></section>
  <section class="report-section"><h1>3. OBJETO DE LA AUDITORÍA</h1><p>El objeto de la presente auditoría es verificar el cumplimiento del proceso prestacional en las áreas seleccionadas, conforme al vínculo prestacional con el INSSJP, evaluando aspectos legales, organizativos, técnicos y de calidad de la traza de atención y de los procesos de apoyo auditados.</p></section>
  <section class="report-section"><h1>4. ALCANCE</h1><p>Análisis del proceso prestacional mediante el relevamiento de las siguientes áreas: <b>${esc(audited.join(", "))}</b>.</p><p>Para llevar adelante la tarea precitada:</p><ul>${scopeText()}</ul><p>El alcance se limita a las áreas seleccionadas en el inicio de la auditoría y a la evidencia efectivamente disponible y observada durante el relevamiento.</p></section>
- ${interviewReportBlock()}<section class="report-section"><h1>${state.interview?.includeInReport&&interviewHasContent()?"6":"5"}. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>Resultado</th></tr><tr><td>${s.active}</td><td>${s.answered}</td><td>${s.dev}</td><td>${s.mod}</td><td>${s.high}</td><td>${(s.compliance*100).toFixed(1)}%</td><td>${esc(riskOverall())}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}</div></section>
+ ${interviewReportBlock()}<section class="report-section"><h1>${state.interview?.includeInReport&&interviewHasContent()?"6":"5"}. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS (0–5)</th><th>Resultado</th></tr><tr><td>${s.active}</td><td>${s.answered}</td><td>${s.dev}</td><td>${s.mod}</td><td>${s.high}</td><td>${(s.compliance*100).toFixed(1)}%</td><td>${formatIIRS(currentIIRS())}</td><td>${esc(riskOverall())}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}</div></section>
  <section class="report-section"><h1>${state.interview?.includeInReport&&interviewHasContent()?"7":"6"}. CONCLUSIONES</h1><p>${esc(conclusionsText())}</p></section>
  <section class="report-section"><h1>${state.interview?.includeInReport&&interviewHasContent()?"8":"7"}. ANEXO TÉCNICO LEGAL</h1>${legalAnnex()}<p class="small">Las referencias normativas deben validarse según jurisdicción, nivel, tipo de establecimiento y requisito concreto antes de citar artículos específicos.</p></section>
  <section class="report-section"><h1>${state.interview?.includeInReport&&interviewHasContent()?"9":"8"}. ANEXO TÉCNICO OPERATIVO - DESVÍOS POR ÁREA Y PROCESO</h1>${technicalAnnex()}</section>
  <div class="signature">Firma del auditor</div></div>`;
 }
-function renderAll(){ensureState();bindMeta();bindInterview();bindRH();renderRH();renderDashboard();renderAudit();renderSummary();renderDevs();renderNorms();renderReport();renderSavedAudits()}
-function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="reportPage")renderReport();if(id==="rrhhPage"){bindRH();renderRH()}if(id==="interviewPage")bindInterview();if(id==="summaryPage"||id==="aiPage")renderSummary();if(id==="aiPage")updateAIConnection();window.scrollTo({top:0,left:0,behavior:"auto"})}
+function renderAll(){ensureState();bindMeta();bindInterview();bindRH();renderRH();renderDashboard();renderAudit();renderSummary();renderDevs();renderNorms();renderReport();renderSavedAudits();if(isManagementRole(currentSessionUser?.role))renderExecutiveDashboard()}
+function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="reportPage")renderReport();if(id==="rrhhPage"){bindRH();renderRH()}if(id==="interviewPage")bindInterview();if(id==="summaryPage"||id==="aiPage")renderSummary();if(id==="aiPage")updateAIConnection();if(id==="executivePage")renderExecutiveDashboard();window.scrollTo({top:0,left:0,behavior:"auto"})}
 function openRHCalculator(){try{const btn=Array.from(document.querySelectorAll(".navbtn")).find(b=>/RRHH Enfermer/i.test(b.textContent||""));showPage("rrhhPage",btn||null);setTimeout(()=>{const first=document.querySelector("#rrhhPage [data-rh]");if(first)first.focus({preventScroll:true});window.scrollTo(0,0)},0)}catch(e){console.error(e);alert("No se pudo abrir la calculadora de Recursos Humanos. Detalle: "+e.message)}}
 function copyText(id){navigator.clipboard.writeText($("#"+id).textContent);alert("Texto copiado")}
 function exportJSON(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="SIAPE_Informe_"+(state.meta.reportNumber||"SN")+"_"+(state.meta.reportYear||"SA")+"_"+(state.meta.prestador||"prestador")+".json";a.click()}
@@ -698,3 +831,201 @@ function applyAIResult(){
 }
 window.addEventListener('online',updateAIConnection);window.addEventListener('offline',updateAIConnection);
 document.addEventListener('DOMContentLoaded',initAI);
+
+
+// ===== SIAPE V3.1.4: autenticación y autorización con Firestore =====
+const V3_PROFILE_KEY='siape_v3_profile';
+const PHOTO_DB='siape_v3_evidence';
+const LOCAL_AUTH_PREFIX='siape_authorized_';
+const MANAGEMENT_ROLES=['administrador','gerente','subgerente','jefa_medicas','jefa_sociales'];
+const PRIMARY_ADMIN_EMAIL='sgrodriguez@pami.org.ar';
+let siapeAuth=null,siapeDb=null,currentSessionUser=null,registeringAccess=false,adminUsersCache=[];
+function isLocalPreview(){return location.protocol==='file:'||['localhost','127.0.0.1'].includes(location.hostname)}
+function normalizeEmail(v){return String(v||'').trim().toLowerCase()}
+function isManagementRole(role){return MANAGEMENT_ROLES.includes(role)}
+function showLoginCard(){
+ const intro=document.getElementById('loginIntro'),card=document.getElementById('authCard');
+ setTimeout(()=>{intro?.classList.add('login-intro-out');card?.classList.remove('auth-card-hidden')},650);
+}
+function initV3Auth(){
+ const cfg=window.SIAPE_FIREBASE_CONFIG||{};const enabled=!!cfg.apiKey;
+ document.getElementById('authConfigured')?.classList.toggle('hide',!enabled);
+ document.getElementById('authSetup')?.classList.toggle('hide',enabled);
+ document.getElementById('localDemo')?.classList.toggle('hide',!isLocalPreview());
+ showLoginCard();
+ if(!enabled)return;
+ try{
+  if(!firebase.apps.length)firebase.initializeApp(cfg);
+  siapeAuth=firebase.auth();
+  siapeDb=firebase.firestore();
+  siapeAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
+  siapeAuth.onAuthStateChanged(async user=>{
+   if(registeringAccess)return;
+   if(user){await validateAuthorizedUser(user)}else lockApplication();
+  });
+ }catch(e){setLoginStatus('Error de configuración: '+friendlyAuthError(e))}
+}
+function setLoginStatus(message,kind='error'){
+ const st=document.getElementById('loginStatus');if(!st)return;
+ st.textContent=message||'';st.dataset.kind=kind;
+}
+function localAuthorization(email){
+ try{return JSON.parse(localStorage.getItem(LOCAL_AUTH_PREFIX+normalizeEmail(email))||'null')}catch{return null}
+}
+function saveLocalAuthorization(profile){
+ localStorage.setItem(LOCAL_AUTH_PREFIX+normalizeEmail(profile.correo),JSON.stringify({correo:normalizeEmail(profile.correo),nombre:profile.nombre||'',apellido:profile.apellido||'',rol:profile.rol||'auditor',estado:'autorizado',validatedAt:new Date().toISOString()}));
+}
+function clearLocalAuthorization(email){localStorage.removeItem(LOCAL_AUTH_PREFIX+normalizeEmail(email))}
+async function validateAuthorizedUser(user){
+ const email=normalizeEmail(user.email);
+ setLoginStatus('Verificando autorización…','info');
+ try{
+  const snap=await siapeDb.collection('usuarios').doc(email).get();
+  if(!snap.exists){
+   clearLocalAuthorization(email);
+   setLoginStatus('Este usuario todavía no tiene una solicitud de acceso. Use “Solicitar acceso”.');
+   await siapeAuth.signOut();return;
+  }
+  const profile=snap.data()||{},estado=String(profile.estado||'').toLowerCase(),rol=String(profile.rol||'auditor').toLowerCase();
+  if(estado!=='autorizado'){
+   clearLocalAuthorization(email);
+   const messages={pendiente:'Su solicitud está pendiente de autorización.',suspendido:'Su acceso fue suspendido.',rechazado:'Su solicitud fue rechazada.'};
+   setLoginStatus(messages[estado]||'Su cuenta no está autorizada.');
+   await siapeAuth.signOut();return;
+  }
+  currentSessionUser={uid:user.uid,email:user.email||email,displayName:`${profile.nombre||''} ${profile.apellido||''}`.trim()||user.email,role:rol,profile};
+  saveLocalAuthorization({...profile,correo:email,rol});
+  setLoginStatus('');unlockApplication();
+ }catch(e){
+  const cached=localAuthorization(email);
+  if((!navigator.onLine||e?.code==='unavailable')&&cached?.estado==='autorizado'){
+   currentSessionUser={uid:user.uid,email,displayName:`${cached.nombre||''} ${cached.apellido||''}`.trim()||email,role:cached.rol||'auditor',profile:cached};
+   setLoginStatus('Ingreso sin conexión con autorización guardada.','info');unlockApplication();return;
+  }
+  setLoginStatus('No se pudo verificar la autorización: '+friendlyAuthError(e));
+  try{await siapeAuth.signOut()}catch{}
+ }
+}
+function friendlyAuthError(e){
+ const c=e?.code||'';
+ if(c.includes('invalid-api-key'))return 'La clave de Firebase no es válida.';
+ if(c.includes('email-already-in-use'))return 'Ese correo ya tiene una cuenta. Use Ingresar o restablezca la contraseña.';
+ if(c.includes('weak-password'))return 'La contraseña debe tener al menos 6 caracteres.';
+ if(c.includes('invalid-email'))return 'El correo electrónico no es válido.';
+ if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found'))return 'Correo o contraseña incorrectos.';
+ if(c.includes('permission-denied'))return 'Firestore rechazó la operación. Revise las reglas publicadas.';
+ if(c.includes('too-many-requests'))return 'Demasiados intentos. Espere unos minutos.';
+ if(c.includes('network-request-failed')||c.includes('unavailable'))return 'No se pudo conectar a Internet.';
+ if(c.includes('unauthorized-domain'))return 'Este dominio todavía no está autorizado en Firebase.';
+ return e?.message||'No se pudo completar la operación.';
+}
+function lockApplication(){
+ document.getElementById('authGate')?.classList.remove('hide','auth-success');document.body.classList.add('locked');
+ document.getElementById('adminNav')?.classList.add('hide');
+ document.getElementById('executiveNav')?.classList.add('hide');
+}
+function unlockApplication(){
+ const gate=document.getElementById('authGate');gate?.classList.add('auth-success');
+ setTimeout(()=>gate?.classList.add('hide'),500);document.body.classList.remove('locked');
+ const el=document.getElementById('sessionUser');if(el)el.textContent=`${currentSessionUser.displayName||currentSessionUser.email} · ${currentSessionUser.role||'auditor'}`;
+ document.getElementById('adminNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
+ document.getElementById('executiveNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
+ applyProfileToAudit();renderUserDashboard();
+}
+async function siapeLogin(){
+ const email=normalizeEmail(document.getElementById('loginEmail').value),password=document.getElementById('loginPassword').value;
+ if(!email||!password){setLoginStatus('Ingrese el correo y la contraseña.');return}
+ setLoginStatus('Verificando…','info');
+ try{await siapeAuth.signInWithEmailAndPassword(email,password)}catch(e){setLoginStatus(friendlyAuthError(e))}
+}
+async function siapeResetPassword(){
+ const email=normalizeEmail(document.getElementById('loginEmail').value);if(!email)return alert('Ingrese primero su correo.');
+ try{await siapeAuth.sendPasswordResetEmail(email);alert('Se envió el correo para restablecer la contraseña.')}catch(e){alert('No se pudo enviar el correo: '+friendlyAuthError(e))}
+}
+async function siapeLogout(){if(siapeAuth)await siapeAuth.signOut();currentSessionUser=null;lockApplication()}
+function enterLocalDemo(){currentSessionUser={uid:'local-demo',email:'local@device',displayName:'Auditor de prueba',role:'administrador'};unlockApplication()}
+function toggleAccessRequest(force){
+ const box=document.getElementById('accessRequestBox');if(!box)return;
+ const show=typeof force==='boolean'?force:box.classList.contains('hide');box.classList.toggle('hide',!show);
+ if(show){const loginEmail=normalizeEmail(document.getElementById('loginEmail')?.value);if(loginEmail)document.getElementById('requestEmail').value=loginEmail;document.getElementById('requestFirstName')?.focus()}
+}
+async function submitAccessRequest(){
+ const nombre=document.getElementById('requestFirstName').value.trim(),apellido=document.getElementById('requestLastName').value.trim(),correo=normalizeEmail(document.getElementById('requestEmail').value),password=document.getElementById('requestPassword').value,password2=document.getElementById('requestPassword2').value;
+ if(!nombre||!apellido||!correo||!password){setLoginStatus('Complete todos los datos de la solicitud.');return}
+ if(password!==password2){setLoginStatus('Las contraseñas no coinciden.');return}
+ if(password.length<6){setLoginStatus('La contraseña debe tener al menos 6 caracteres.');return}
+ registeringAccess=true;setLoginStatus('Enviando solicitud…','info');
+ try{
+  const cred=await siapeAuth.createUserWithEmailAndPassword(correo,password);
+  await siapeDb.collection('usuarios').doc(correo).set({nombre,apellido,correo,estado:'pendiente',rol:'auditor'});
+  await cred.user.updateProfile({displayName:`${nombre} ${apellido}`}).catch(()=>{});
+  await siapeAuth.signOut();
+  document.getElementById('loginEmail').value=correo;document.getElementById('loginPassword').value='';
+  toggleAccessRequest(false);setLoginStatus('Solicitud enviada. Espere la autorización de un responsable.','success');
+ }catch(e){setLoginStatus(friendlyAuthError(e))}
+ finally{registeringAccess=false}
+}
+async function loadAdminUsers(){
+ if(!isManagementRole(currentSessionUser?.role))return;
+ const status=document.getElementById('adminUserStatus');if(status)status.textContent='Cargando usuarios…';
+ try{
+  const snap=await siapeDb.collection('usuarios').get();adminUsersCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderAdminUsers();if(status)status.textContent=`${adminUsersCache.length} usuario(s).`;
+ }catch(e){if(status)status.textContent='No se pudieron cargar los usuarios: '+friendlyAuthError(e)}
+}
+function renderAdminUsers(){
+ const el=document.getElementById('adminUsersList');if(!el)return;
+ const q=normalizeEmail(document.getElementById('adminUserSearch')?.value),filter=document.getElementById('adminUserFilter')?.value||'todos';
+ const list=adminUsersCache.filter(u=>{const text=`${u.nombre||''} ${u.apellido||''} ${u.correo||u.id}`.toLowerCase();return(!q||text.includes(q))&&(filter==='todos'||u.estado===filter)}).sort((a,b)=>String(a.apellido||a.correo).localeCompare(String(b.apellido||b.correo),'es'));
+ if(!list.length){el.innerHTML='<div class="notice">No hay usuarios para mostrar.</div>';return}
+ el.innerHTML=list.map(u=>{
+  const email=normalizeEmail(u.correo||u.id),self=email===normalizeEmail(currentSessionUser?.email),primary=normalizeEmail(currentSessionUser?.email)===PRIMARY_ADMIN_EMAIL;
+  const roleOptions=['auditor','gerente','subgerente','jefa_medicas','jefa_sociales','administrador'].map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${roleLabel(r)}</option>`).join('');
+  return `<div class="admin-user-card"><div class="admin-user-head"><div><div class="admin-user-name">${esc(`${u.nombre||''} ${u.apellido||''}`.trim()||email)}</div><div class="admin-user-meta">${esc(email)}<br>Rol: ${esc(roleLabel(u.rol||'auditor'))}</div></div><span class="user-state user-state-${esc(u.estado||'pendiente')}">${esc(u.estado||'pendiente')}</span></div><div class="admin-user-actions">${u.estado!=='autorizado'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Autorizar</button>`:''}${u.estado!=='rechazado'?`<button class="secondary" onclick="setUserStatus('${esc(email)}','rechazado')">Rechazar</button>`:''}${u.estado==='autorizado'&&!self?`<button class="danger" onclick="setUserStatus('${esc(email)}','suspendido')">Suspender</button>`:''}${u.estado==='suspendido'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Reactivar</button>`:''}${!self?`<button class="danger" onclick="deleteUserRecord('${esc(email)}')">Eliminar registro</button>`:''}</div>${primary?`<div class="role-editor"><label>Rol</label><select id="role-${safeDomId(email)}">${roleOptions}</select><button class="secondary" onclick="setUserRole('${esc(email)}')">Guardar rol</button></div>`:''}</div>`;
+ }).join('');
+}
+function roleLabel(role){return({administrador:'Administrador',gerente:'Gerente',subgerente:'Subgerente',jefa_medicas:'Jefa Departamento Médicas',jefa_sociales:'Jefa Departamento Sociales',auditor:'Auditor'})[role]||role}
+function safeDomId(v){return String(v).replace(/[^a-z0-9_-]/gi,'_')}
+async function setUserStatus(email,estado){
+ if(!isManagementRole(currentSessionUser?.role))return;
+ if(!confirm(`¿Confirmar estado “${estado}” para ${email}?`))return;
+ try{await siapeDb.collection('usuarios').doc(email).update({estado});await loadAdminUsers()}catch(e){alert(friendlyAuthError(e))}
+}
+async function setUserRole(email){
+ if(normalizeEmail(currentSessionUser?.email)!==PRIMARY_ADMIN_EMAIL)return alert('Solo el Administrador Principal puede cambiar roles.');
+ const role=document.getElementById('role-'+safeDomId(email))?.value;if(!role)return;
+ try{await siapeDb.collection('usuarios').doc(email).update({rol:role});await loadAdminUsers()}catch(e){alert(friendlyAuthError(e))}
+}
+async function deleteUserRecord(email){
+ if(!isManagementRole(currentSessionUser?.role))return;
+ if(!confirm(`¿Eliminar el registro de ${email}?\n\nLa cuenta de Authentication deberá eliminarse aparte desde Firebase.`))return;
+ try{await siapeDb.collection('usuarios').doc(email).delete();clearLocalAuthorization(email);await loadAdminUsers()}catch(e){alert(friendlyAuthError(e))}
+}
+
+function renderV3Settings(){const p=JSON.parse(localStorage.getItem(V3_PROFILE_KEY)||'{}');['Name','License','Institution','Email'].forEach(k=>{const e=document.getElementById('profile'+k);if(e)e.value=p[k.toLowerCase()]||''})}
+function saveV3Settings(){const p={name:profileName.value.trim(),license:profileLicense.value.trim(),institution:profileInstitution.value.trim(),email:profileEmail.value.trim()};localStorage.setItem(V3_PROFILE_KEY,JSON.stringify(p));applyProfileToAudit();alert('Configuración guardada en este dispositivo.')}
+function applyProfileToAudit(){const p=JSON.parse(localStorage.getItem(V3_PROFILE_KEY)||'{}');if(p.name&&!state.meta.auditor){state.meta.auditor=p.name;save();const e=document.querySelector('[data-meta="auditor"]');if(e)e.value=p.name}}
+function renderUserDashboard(){const lib=JSON.parse(localStorage.getItem(LIBKEY)||'{}'),items=Object.values(lib),p=JSON.parse(localStorage.getItem(V3_PROFILE_KEY)||'{}');const w=document.getElementById('userWelcome');if(w)w.innerHTML=`<h3>Buenos días, ${esc(p.name||currentSessionUser?.displayName||'Auditor')}</h3><div>${esc(p.institution||'Auditoría Prestacional')}</div>`;const k=document.getElementById('userDashboardKpis');if(k)k.innerHTML=`<div class="kpi"><span>Auditorías guardadas</span><b>${items.length}</b></div><div class="kpi"><span>Prestadores</span><b>${new Set(items.map(x=>x.state?.meta?.prestador).filter(Boolean)).size}</b></div><div class="kpi"><span>Auditoría actual</span><b>${esc(reportId())}</b></div><div class="kpi"><span>Rol</span><b>${esc(currentSessionUser?.role||'auditor')}</b></div>`}
+
+function openPhotoDB(){return new Promise((res,rej)=>{const r=indexedDB.open(PHOTO_DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('photos')){const s=db.createObjectStore('photos',{keyPath:'id'});s.createIndex('auditCode','auditCode')}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+function auditStorageId(){return `${state.meta.reportNumber||'SN'}_${state.meta.reportYear||'SA'}_${state.meta.prestador||'PRESTADOR'}`.replace(/[^a-z0-9_-]+/gi,'_').toLowerCase()}
+async function compressImage(file){const bmp=await createImageBitmap(file);const max=1400,scale=Math.min(1,max/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.height=Math.round(bmp.height*scale);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);return new Promise(r=>c.toBlob(r,'image/jpeg',.78))}
+async function addEvidencePhotos(code,files){if(!files?.length)return;const db=await openPhotoDB();for(const f of files){const blob=await compressImage(f);await new Promise((res,rej)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').put({id:crypto.randomUUID(),auditId:auditStorageId(),auditCode:`${auditStorageId()}|${code}`,code,blob,name:f.name,createdAt:new Date().toISOString()});tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}await renderPhotoPreview(code);refreshVisiblePhotoCounts()}
+async function getEvidencePhotos(code,auditId=auditStorageId()){const db=await openPhotoDB();return new Promise((res,rej)=>{const r=db.transaction('photos').objectStore('photos').index('auditCode').getAll(`${auditId}|${code}`);r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
+async function deleteEvidencePhoto(id,code){const db=await openPhotoDB();await new Promise((res,rej)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').delete(id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});renderPhotoPreview(code);refreshVisiblePhotoCounts()}
+async function renderPhotoPreview(code){const el=document.getElementById('photo-preview-'+code);if(!el)return;const photos=await getEvidencePhotos(code);el.innerHTML=photos.map(p=>`<div class="photo-thumb"><img src="${URL.createObjectURL(p.blob)}"><button class="danger" onclick="deleteEvidencePhoto('${p.id}','${code}')">×</button></div>`).join('')}
+async function refreshVisiblePhotoCounts(){document.querySelectorAll('[id^="photo-count-"]').forEach(async el=>{const code=el.id.replace('photo-count-',''),ps=await getEvidencePhotos(code);el.textContent=ps.length;renderPhotoPreview(code)})}
+async function openEvidenceGallery(code){const ps=await getEvidencePhotos(code);if(!ps.length)return alert('No hay fotografías asociadas a este desvío.');renderPhotoPreview(code);document.getElementById('photo-preview-'+code)?.scrollIntoView({behavior:'smooth',block:'center'})}
+async function prepareReportWithPhotos(){renderReport();const ds=deviations();const blocks=[];for(const i of ds){const ps=await getEvidencePhotos(i.code);if(ps.length){blocks.push(`<section class="report-section photo-report"><h1>EVIDENCIA FOTOGRÁFICA · ${esc(i.code)}</h1><p><b>${esc(i.service)}:</b> ${esc(i.item)}</p><div class="report-photo-grid">${ps.map((p,n)=>`<figure><img src="${URL.createObjectURL(p.blob)}"><figcaption>Fotografía ${n+1} · ${new Date(p.createdAt).toLocaleString()}</figcaption></figure>`).join('')}</div></section>`)}}document.getElementById('reportContent').insertAdjacentHTML('beforeend',blocks.join(''));alert(blocks.length?'Informe preparado con fotografías.':'No hay fotografías cargadas en los desvíos.')}
+
+function auditShareText(){return `SIAPE · Informe ${reportId()}\nPrestador: ${state.meta.prestador||'Sin identificar'}\nFecha: ${state.meta.date||''}\nAuditor: ${state.meta.auditor||''}\nDesvíos: ${stats().dev}\nRiesgo: ${riskOverall()}`}
+function downloadCurrentHTML(){renderReport();const blob=new Blob([`<!doctype html><meta charset="utf-8"><title>SIAPE ${reportId()}</title><link rel="stylesheet" href="styles.css">${document.getElementById('reportContent').innerHTML}`],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`SIAPE_${reportId().replace('/','_')}.html`;a.click();return blob}
+async function finalizeAndShare(){saveAuditSnapshot();await shareCurrentReport()}
+async function shareCurrentReport(){const text=auditShareText();if(navigator.share){try{await navigator.share({title:`SIAPE · Informe ${reportId()}`,text});return}catch(e){if(e.name==='AbortError')return}}const action=prompt('Escriba una opción: CORREO, WHATSAPP, DESCARGAR o CANCELAR','CORREO');if(!action)return;const a=action.toUpperCase();if(a.startsWith('CORREO')){const to=prompt('Correo destinatario:','')||'';location.href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent('SIAPE · Informe '+reportId())}&body=${encodeURIComponent(text+'\n\nAdjunte el informe generado desde SIAPE.')}`}else if(a.startsWith('WHATS')){window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank')}else if(a.startsWith('DESC'))downloadCurrentHTML()}
+function shareSavedAudit(id){loadAuditSnapshot(id);setTimeout(shareCurrentReport,100)}
+async function exportFullBackup(){const db=await openPhotoDB();const photos=await new Promise((res,rej)=>{const r=db.transaction('photos').objectStore('photos').getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});const encoded=[];for(const p of photos){encoded.push({...p,blob:await blobToDataURL(p.blob)})}const backup={version:'3.0',createdAt:new Date().toISOString(),current:state,library:JSON.parse(localStorage.getItem(LIBKEY)||'{}'),profile:JSON.parse(localStorage.getItem(V3_PROFILE_KEY)||'{}'),photos:encoded};const b=new Blob([JSON.stringify(backup)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`SIAPE_RESPALDO_${new Date().toISOString().slice(0,10)}.json`;a.click()}
+function blobToDataURL(blob){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(blob)})}
+async function dataURLToBlob(s){return (await fetch(s)).blob()}
+async function importFullBackup(input){const f=input.files?.[0];if(!f)return;try{const b=JSON.parse(await f.text());if(!b.version)throw new Error('Formato inválido');state=b.current;localStorage.setItem(LIBKEY,JSON.stringify(b.library||{}));localStorage.setItem(V3_PROFILE_KEY,JSON.stringify(b.profile||{}));const db=await openPhotoDB();for(const p of b.photos||[]){p.blob=await dataURLToBlob(p.blob);await new Promise((res,rej)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').put(p);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}ensureState();save();renderAll();alert('Respaldo importado correctamente.')}catch(e){alert('No se pudo importar: '+e.message)}finally{input.value=''}}
+
+document.addEventListener('DOMContentLoaded',()=>{lockApplication();initV3Auth();renderV3Settings()});
