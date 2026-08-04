@@ -1,0 +1,6 @@
+SIGAP V3.4.2 - SEGUIMIENTO DEMOSTRATIVO
+
+Esta versión agrega un módulo de prueba para derivar a la Subgerencia de Seguimiento los desvíos detectados por la GAP.
+
+Incluye datos ficticios, agrupación por área, estados de subsanación, observaciones, resumen e impresión del paquete.
+No envía información real ni modifica Firestore.

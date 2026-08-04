@@ -36,7 +36,7 @@
 <div class="app-watermark" aria-hidden="true"><img src="pami-logo.png" alt=""></div>
 
 <header><div class="session-bar"><span id="sessionUser">Sin sesión</span><button class="session-btn" onclick="siapeLogout()">Cerrar sesión</button></div><h1>SIAPE GAP · Sistema Integral de Auditoría Prestacional</h1><p>Informe institucional basado en modelo GAP · biblioteca normativa por servicio · PC y tablet</p><nav>
-<button class="navbtn active" onclick="showPage('startPage',this)">Inicio</button><button class="navbtn" onclick="showPage('userDashPage',this);renderUserDashboard()">Mi panel</button><button class="navbtn" onclick="showPage('auditPage',this)">Auditorías</button><button class="navbtn" onclick="showPage('interviewPage',this)">Entrevista y notas</button><button class="navbtn" onclick="showPage('rrhhPage',this)">RRHH Enfermería</button><button class="navbtn ai-nav" onclick="showPage('aiPage',this)">🧠 Motor IA</button><button class="navbtn" onclick="showPage('dashPage',this)">Panel general</button><button id="executiveNav" class="navbtn hide" onclick="showPage('executivePage',this);renderExecutiveDashboard()">Tablero ejecutivo</button><button id="providerMapNav" class="navbtn hide" onclick="showPage('providerMapPage',this);renderProviderMap()">Mapa prestacional</button><button class="navbtn" onclick="showPage('summaryPage',this)">Resumen y acta</button><button class="navbtn" onclick="showPage('devPage',this)">Desvíos</button><button class="navbtn" onclick="showPage('planPage',this)">Plan de mejora</button><button class="navbtn" onclick="showPage('normPage',this)">Normativa</button><button class="navbtn" onclick="showPage('reportPage',this)">Informe PDF</button><button class="navbtn" onclick="showPage('settingsPage',this);renderV3Settings()">Configuración</button><button id="adminNav" class="navbtn hide" onclick="showPage('adminPage',this);loadAdminUsers()">Administración</button>
+<button class="navbtn active" onclick="showPage('startPage',this)">Inicio</button><button class="navbtn" onclick="showPage('userDashPage',this);renderUserDashboard()">Mi panel</button><button class="navbtn" onclick="showPage('auditPage',this)">Auditorías</button><button class="navbtn" onclick="showPage('interviewPage',this)">Entrevista y notas</button><button class="navbtn" onclick="showPage('rrhhPage',this)">RRHH Enfermería</button><button class="navbtn ai-nav" onclick="showPage('aiPage',this)">🧠 Motor IA</button><button class="navbtn" onclick="showPage('dashPage',this)">Panel general</button><button id="executiveNav" class="navbtn hide" onclick="showPage('executivePage',this);renderExecutiveDashboard()">Tablero ejecutivo</button><button id="providerMapNav" class="navbtn hide" onclick="showPage('providerMapPage',this);renderProviderMap()">Mapa prestacional</button><button id="followupNav" class="navbtn hide" onclick="showPage('followupPage',this);renderFollowupModule()">Seguimiento</button><button class="navbtn" onclick="showPage('summaryPage',this)">Resumen y acta</button><button class="navbtn" onclick="showPage('devPage',this)">Desvíos</button><button class="navbtn" onclick="showPage('planPage',this)">Plan de mejora</button><button class="navbtn" onclick="showPage('normPage',this)">Normativa</button><button class="navbtn" onclick="showPage('reportPage',this)">Informe PDF</button><button class="navbtn" onclick="showPage('settingsPage',this);renderV3Settings()">Configuración</button><button id="adminNav" class="navbtn hide" onclick="showPage('adminPage',this);loadAdminUsers()">Administración</button>
 </nav></header><main>
 <section id="startPage" class="page active"><div class="card"><h2>Identificación de la auditoría</h2><div class="grid">
 <div><label>Número de informe</label><input data-meta="reportNumber" inputmode="numeric" placeholder="188"></div><div><label>Año del informe</label><input data-meta="reportYear" inputmode="numeric" placeholder="2026"></div><div><label>Prestador</label><input data-meta="prestador"></div><div><label>CUIT</label><input data-meta="cuit"></div><div><label>Provincia / jurisdicción</label><select data-meta="province"><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Santiago del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div><div><label>Nivel PAMI</label><select data-meta="level"><option>I</option><option>II</option><option>III</option><option>IV</option></select></div>
@@ -154,6 +154,43 @@
     </aside>
   </div>
   <div class="notice">Datos demostrativos: los nombres, cápitas e indicadores de esta prueba son ficticios. La versión definitiva utilizará el padrón institucional validado y las auditorías sincronizadas.</div>
+</section>
+
+<section id="followupPage" class="page">
+  <div class="card executive-head">
+    <div>
+      <h2>Derivación y Seguimiento de Desvíos</h2>
+      <p>Versión demostrativa para transferir a la Subgerencia de Seguimiento los desvíos detectados por la GAP, organizados por prestador y área.</p>
+    </div>
+    <div class="toolbar">
+      <button class="secondary" type="button" onclick="resetFollowupDemo()">Restablecer prueba</button>
+      <button class="primary" type="button" onclick="printFollowupPackage()">Imprimir paquete</button>
+    </div>
+  </div>
+  <div id="followupKpis" class="kpis executive-kpis"></div>
+  <div class="card">
+    <div class="grid">
+      <div><label>Prestador</label><select id="followupProvider" onchange="renderFollowupModule()"></select></div>
+      <div><label>Área</label><select id="followupArea" onchange="renderFollowupModule()"><option value="">Todas las áreas</option></select></div>
+      <div><label>Estado</label><select id="followupStatus" onchange="renderFollowupModule()"><option value="">Todos</option><option value="pendiente">Pendiente</option><option value="parcial">Parcialmente subsanado</option><option value="subsanado">Subsanado</option><option value="no_subsanado">No subsanado</option></select></div>
+      <div><label>UGL de destino</label><select id="followupUGL" onchange="updateFollowupHeader()"><option>UGL XXXII · Luján</option><option>UGL VI · Capital Federal</option><option>UGL VII · La Plata</option><option>UGL IX · Rosario</option></select></div>
+    </div>
+  </div>
+  <div class="followup-layout">
+    <div>
+      <div id="followupHeader" class="card followup-package-head"></div>
+      <div id="followupAreaGroups"></div>
+    </div>
+    <aside class="card followup-side">
+      <h2>Resumen para Seguimiento</h2>
+      <div id="followupSummary"></div>
+      <div class="toolbar">
+        <button class="primary" type="button" onclick="generateFollowupReferral()">Generar derivación</button>
+        <button class="secondary" type="button" onclick="copyFollowupSummary()">Copiar resumen</button>
+      </div>
+    </aside>
+  </div>
+  <div class="notice">Demostración local con datos ficticios. En la versión definitiva, los desvíos se tomarán automáticamente de las auditorías cerradas y podrán enviarse a la Subgerencia de Seguimiento y a la UGL correspondiente.</div>
 </section>
 
 <section id="summaryPage" class="page"><div class="grid2"><div class="card"><h2>Resumen ejecutivo automático</h2><div id="execText" class="summary-text"></div><button class="secondary no-print" onclick="copyText('execText')">Copiar resumen</button></div><div class="card"><h2>Síntesis de desvíos para el acta</h2><div id="actText" class="summary-text"></div><button class="secondary no-print" onclick="copyText('actText')">Copiar síntesis</button></div></div>
