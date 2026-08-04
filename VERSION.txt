@@ -1,4 +1,6 @@
-SIAPE GAP
-Versión oficial: 3.4.0
-Base consolidada: Login + Administración + IIRS + Ranking + Tablero Ejecutivo
+SIGAP
+Versión de prueba: 3.4.1
+Base: V3.4.0 oficial + Mapa Prestacional demostrativo
+Datos cartográficos: OpenStreetMap
+Datos de prestadores: ficticios para demostración
 Fecha: 2026-08-04

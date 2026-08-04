@@ -1,6 +1,6 @@
 {
-  "name": "SIAPE GAP V3.4.0 · Auditoría Prestacional",
-  "short_name": "SIAPE GAP",
+  "name": "SIGAP · Mapa Prestacional de prueba",
+  "short_name": "SIGAP",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7f9",

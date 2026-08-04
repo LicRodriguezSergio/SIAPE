@@ -1,4 +1,4 @@
-const CACHE='siape-gap-v3-4-0-oficial';
+const CACHE='sigap-v3-4-1-mapa-demo';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./data.js','./manifest.json','./firebase-config.js','./pami-logo.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));

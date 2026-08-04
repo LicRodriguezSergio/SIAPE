@@ -1,0 +1,16 @@
+SIAPE GAP V3.4.1 — MAPA PRESTACIONAL DEMOSTRATIVO
+
+Esta versión agrega un mapa interactivo de la República Argentina con prestadores ficticios.
+
+Acceso:
+- El botón “Mapa prestacional” aparece únicamente para roles de gestión.
+- Requiere conexión a Internet para cargar el mapa base de OpenStreetMap.
+
+Funciones de prueba:
+- Marcadores por ubicación.
+- Color según IIRS.
+- Filtros por provincia, complejidad y riesgo.
+- Ficha desplegable con cápitas, cumplimiento, IIRS y áreas auditadas.
+
+IMPORTANTE:
+Los nombres, cápitas e indicadores son ficticios. No usar para decisiones institucionales.

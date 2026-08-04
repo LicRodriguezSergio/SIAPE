@@ -13,3 +13,9 @@
 
 ## Nota
 El ranking y el tablero se calculan con las auditorías guardadas en el dispositivo actual. No consolidan todavía datos de otros dispositivos.
+
+## V3.4.1 · Mapa Prestacional demostrativo
+- Mapa visible de Argentina con marcadores de prestadores ficticios.
+- Ficha desplegable por prestador.
+- Filtros por provincia, complejidad y nivel de riesgo.
+- KPIs de cápitas, IIRS y prestadores en rojo.

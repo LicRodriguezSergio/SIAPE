@@ -682,7 +682,7 @@ function renderReport(){
  <div class="signature">Firma del auditor</div></div>`;
 }
 function renderAll(){ensureState();bindMeta();bindInterview();bindRH();renderRH();renderDashboard();renderAudit();renderSummary();renderDevs();renderNorms();renderReport();renderSavedAudits();if(isManagementRole(currentSessionUser?.role))renderExecutiveDashboard()}
-function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="reportPage")renderReport();if(id==="rrhhPage"){bindRH();renderRH()}if(id==="interviewPage")bindInterview();if(id==="summaryPage"||id==="aiPage")renderSummary();if(id==="aiPage")updateAIConnection();if(id==="executivePage")renderExecutiveDashboard();window.scrollTo({top:0,left:0,behavior:"auto"})}
+function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="reportPage")renderReport();if(id==="rrhhPage"){bindRH();renderRH()}if(id==="interviewPage")bindInterview();if(id==="summaryPage"||id==="aiPage")renderSummary();if(id==="aiPage")updateAIConnection();if(id==="executivePage")renderExecutiveDashboard();if(id==="providerMapPage")renderProviderMap();window.scrollTo({top:0,left:0,behavior:"auto"})}
 function openRHCalculator(){try{const btn=Array.from(document.querySelectorAll(".navbtn")).find(b=>/RRHH Enfermer/i.test(b.textContent||""));showPage("rrhhPage",btn||null);setTimeout(()=>{const first=document.querySelector("#rrhhPage [data-rh]");if(first)first.focus({preventScroll:true});window.scrollTo(0,0)},0)}catch(e){console.error(e);alert("No se pudo abrir la calculadora de Recursos Humanos. Detalle: "+e.message)}}
 function copyText(id){navigator.clipboard.writeText($("#"+id).textContent);alert("Texto copiado")}
 function exportJSON(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="SIAPE_Informe_"+(state.meta.reportNumber||"SN")+"_"+(state.meta.reportYear||"SA")+"_"+(state.meta.prestador||"prestador")+".json";a.click()}
@@ -919,10 +919,82 @@ function friendlyAuthError(e){
  if(c.includes('unauthorized-domain'))return 'Este dominio todavía no está autorizado en Firebase.';
  return e?.message||'No se pudo completar la operación.';
 }
+
+
+// ===== MAPA PRESTACIONAL DEMOSTRATIVO V3.4.1 =====
+const DEMO_PROVIDERS = [
+ {id:'demo-caba-1',name:'Hospital Metropolitano de Prueba',province:'CABA',city:'Ciudad Autónoma de Buenos Aires',lat:-34.6037,lng:-58.3816,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:18450,compliance:88,iirs:1.2,lastAudit:'28/07/2026',areas:['Área Médica','Enfermería','Laboratorio','Hemoterapia','Imágenes']},
+ {id:'demo-ba-1',name:'Clínica Regional Oeste',province:'Buenos Aires',city:'Luján',lat:-34.5703,lng:-59.1050,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:9300,compliance:72,iirs:2.7,lastAudit:'22/07/2026',areas:['Área Médica','Enfermería','Esterilización','Limpieza','Lavadero']},
+ {id:'demo-cordoba-1',name:'Sanatorio Central Córdoba',province:'Córdoba',city:'Córdoba',lat:-31.4201,lng:-64.1888,type:'Sanatorio',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:12680,compliance:54,iirs:4.1,lastAudit:'15/07/2026',areas:['Área Médica','Enfermería','Hemodinamia','Imágenes','Farmacia']},
+ {id:'demo-santafe-1',name:'Instituto Asistencial del Litoral',province:'Santa Fe',city:'Rosario',lat:-32.9442,lng:-60.6505,type:'Instituto médico',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:11120,compliance:81,iirs:1.9,lastAudit:'09/07/2026',areas:['Área Médica','Enfermería','Laboratorio','Nutrición']},
+ {id:'demo-mendoza-1',name:'Centro Médico Andino',province:'Mendoza',city:'Mendoza',lat:-32.8895,lng:-68.8458,type:'Centro médico',complexity:'Baja complejidad',module:'Atención ambulatoria',capitas:4800,compliance:93,iirs:0.7,lastAudit:'01/07/2026',areas:['Área Médica','Enfermería','Imágenes']},
+ {id:'demo-tucuman-1',name:'Clínica del Norte',province:'Tucumán',city:'San Miguel de Tucumán',lat:-26.8083,lng:-65.2176,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:7600,compliance:63,iirs:3.2,lastAudit:'25/06/2026',areas:['Área Médica','Enfermería','Laboratorio','Hemoterapia']},
+ {id:'demo-neuquen-1',name:'Hospital Patagónico de Prueba',province:'Neuquén',city:'Neuquén',lat:-38.9516,lng:-68.0591,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:6900,compliance:null,iirs:null,lastAudit:'Sin auditoría',areas:[]}
+];
+let providerMapInstance=null;
+let providerMapLayer=null;
+function providerRiskKey(p){if(p.iirs===null||p.iirs===undefined)return'gris';if(p.iirs<=2)return'verde';if(p.iirs<4)return'amarillo';return'rojo'}
+function providerRiskLabel(p){const k=providerRiskKey(p);return k==='verde'?'Verde · Buen cumplimiento':k==='amarillo'?'Amarillo · Riesgo moderado':k==='rojo'?'Rojo · Riesgo alto':'Gris · Sin auditoría'}
+function providerMarkerStyle(p){const k=providerRiskKey(p);const colors={verde:'#15803d',amarillo:'#ca8a04',rojo:'#b91c1c',gris:'#64748b'};return{radius:9,fillColor:colors[k],color:'#ffffff',weight:2,opacity:1,fillOpacity:.92}}
+function filteredDemoProviders(){
+ const search=(document.getElementById('providerMapSearch')?.value||'').trim().toLowerCase();
+ const province=document.getElementById('providerMapProvince')?.value||'';
+ const complexity=document.getElementById('providerMapComplexity')?.value||'';
+ const risk=document.getElementById('providerMapRisk')?.value||'';
+ return DEMO_PROVIDERS.filter(p=>(!search||`${p.name} ${p.province} ${p.city}`.toLowerCase().includes(search))&&(!province||p.province===province)&&(!complexity||p.complexity===complexity)&&(!risk||providerRiskKey(p)===risk));
+}
+function renderProviderMap(){
+ if(typeof L==='undefined'){document.getElementById('providerMapDetail').innerHTML='<h2>Mapa no disponible</h2><p>No se pudo cargar el componente cartográfico. Verifique la conexión a Internet.</p>';return}
+ const select=document.getElementById('providerMapProvince');
+ if(select&&select.options.length===1)[...new Set(DEMO_PROVIDERS.map(p=>p.province))].sort().forEach(v=>select.add(new Option(v,v)));
+ if(!providerMapInstance){
+  providerMapInstance=L.map('providerMap',{zoomControl:true,minZoom:3}).setView([-38.4,-63.6],4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap'}).addTo(providerMapInstance);
+  providerMapLayer=L.layerGroup().addTo(providerMapInstance);
+ }
+ setTimeout(()=>providerMapInstance.invalidateSize(),100);
+ renderProviderMapMarkers();
+}
+function renderProviderMapMarkers(){
+ if(!providerMapInstance||!providerMapLayer)return;
+ providerMapLayer.clearLayers();
+ const items=filteredDemoProviders();
+ items.forEach(p=>{
+  const marker=L.circleMarker([p.lat,p.lng],providerMarkerStyle(p)).addTo(providerMapLayer);
+  marker.bindTooltip(`${p.name}<br>${p.city}, ${p.province}`);
+  marker.on('click',()=>showProviderMapDetail(p));
+ });
+ const audited=items.filter(p=>p.iirs!==null);const totalCapitas=items.reduce((s,p)=>s+(p.capitas||0),0);const avg=audited.length?audited.reduce((s,p)=>s+p.iirs,0)/audited.length:null;
+ const k=document.getElementById('providerMapKpis');if(k)k.innerHTML=[
+  `<div class="kpi"><b>${items.length}</b><span>Prestadores visibles</span></div>`,
+  `<div class="kpi"><b>${totalCapitas.toLocaleString('es-AR')}</b><span>Cápitas demostrativas</span></div>`,
+  `<div class="kpi"><b>${avg===null?'—':avg.toFixed(2)}</b><span>IIRS promedio</span></div>`,
+  `<div class="kpi"><b>${items.filter(p=>providerRiskKey(p)==='rojo').length}</b><span>Prestadores en rojo</span></div>`
+ ].join('');
+}
+function showProviderMapDetail(p){
+ const compliance=p.compliance===null?'Sin datos':`${p.compliance}%`;
+ const iirs=p.iirs===null?'Sin auditoría':p.iirs.toFixed(1);
+ document.getElementById('providerMapDetail').innerHTML=`
+  <div class="map-risk-chip map-risk-${providerRiskKey(p)}">${providerRiskLabel(p)}</div>
+  <h2>${esc(p.name)}</h2>
+  <p><b>${esc(p.city)}, ${esc(p.province)}</b></p>
+  <dl class="provider-detail-list">
+   <div><dt>Tipo</dt><dd>${esc(p.type)}</dd></div><div><dt>Complejidad</dt><dd>${esc(p.complexity)}</dd></div>
+   <div><dt>Modalidad</dt><dd>${esc(p.module)}</dd></div><div><dt>Cápitas</dt><dd>${p.capitas.toLocaleString('es-AR')}</dd></div>
+   <div><dt>Cumplimiento</dt><dd>${compliance}</dd></div><div><dt>IIRS</dt><dd>${iirs}</dd></div>
+   <div><dt>Última auditoría</dt><dd>${esc(p.lastAudit)}</dd></div>
+  </dl>
+  <h3>Áreas auditadas</h3><p>${p.areas.length?p.areas.map(esc).join(' · '):'Todavía no registra áreas auditadas.'}</p>
+  <button class="primary" type="button" onclick="alert('En la versión definitiva este botón abrirá la ficha completa del prestador, su historial, auditorías y planes de mejora.')">Ver ficha completa</button>`;
+}
+function resetProviderMapFilters(){['providerMapSearch','providerMapProvince','providerMapComplexity','providerMapRisk'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});renderProviderMapMarkers();if(providerMapInstance)providerMapInstance.setView([-38.4,-63.6],4);document.getElementById('providerMapDetail').innerHTML='<h2>Información del prestador</h2><p class="small">Seleccione un punto del mapa para consultar sus datos.</p>'}
+
 function lockApplication(){
  document.getElementById('authGate')?.classList.remove('hide','auth-success');document.body.classList.add('locked');
  document.getElementById('adminNav')?.classList.add('hide');
  document.getElementById('executiveNav')?.classList.add('hide');
+ document.getElementById('providerMapNav')?.classList.add('hide');
 }
 function unlockApplication(){
  const gate=document.getElementById('authGate');gate?.classList.add('auth-success');
@@ -930,6 +1002,7 @@ function unlockApplication(){
  const el=document.getElementById('sessionUser');if(el)el.textContent=`${currentSessionUser.displayName||currentSessionUser.email} · ${currentSessionUser.role||'auditor'}`;
  document.getElementById('adminNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
  document.getElementById('executiveNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
+ document.getElementById('providerMapNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
  applyProfileToAudit();renderUserDashboard();
 }
 async function siapeLogin(){
