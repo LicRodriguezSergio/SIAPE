@@ -109,3 +109,12 @@ body:not(.locked) main,body:not(.locked) header{animation:siapeEnter .5s ease bo
 .leaflet-popup-content{font-family:inherit}
 @media(max-width:900px){.map-layout{grid-template-columns:1fr}.map-detail{position:static}#providerMap{height:520px}}
 @media(max-width:520px){#providerMap{height:440px}.provider-detail-list div{grid-template-columns:1fr}.provider-detail-list dt{margin-bottom:-4px}}
+
+/* Etiqueta cartográfica institucional */
+.malvinas-label-wrap{background:transparent!important;border:0!important}
+.malvinas-label{
+ display:inline-block;min-width:116px;padding:3px 7px;text-align:center;white-space:nowrap;
+ color:#31586a;font-size:12px;font-weight:600;line-height:1.15;
+ background:rgba(170,211,223,.97);border-radius:3px;box-shadow:0 0 0 2px rgba(170,211,223,.97)
+}
+.malvinas-dot{width:7px;height:7px;margin:2px auto 0;border:1px solid #6f9daf;border-radius:50%;background:rgba(170,211,223,.97)}

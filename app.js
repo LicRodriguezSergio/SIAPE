@@ -933,6 +933,7 @@ const DEMO_PROVIDERS = [
 ];
 let providerMapInstance=null;
 let providerMapLayer=null;
+let malvinasLabelMarker=null;
 function providerRiskKey(p){if(p.iirs===null||p.iirs===undefined)return'gris';if(p.iirs<=2)return'verde';if(p.iirs<4)return'amarillo';return'rojo'}
 function providerRiskLabel(p){const k=providerRiskKey(p);return k==='verde'?'Verde · Buen cumplimiento':k==='amarillo'?'Amarillo · Riesgo moderado':k==='rojo'?'Rojo · Riesgo alto':'Gris · Sin auditoría'}
 function providerMarkerStyle(p){const k=providerRiskKey(p);const colors={verde:'#15803d',amarillo:'#ca8a04',rojo:'#b91c1c',gris:'#64748b'};return{radius:9,fillColor:colors[k],color:'#ffffff',weight:2,opacity:1,fillOpacity:.92}}
@@ -951,6 +952,18 @@ function renderProviderMap(){
   providerMapInstance=L.map('providerMap',{zoomControl:true,minZoom:3}).setView([-38.4,-63.6],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap'}).addTo(providerMapInstance);
   providerMapLayer=L.layerGroup().addTo(providerMapInstance);
+  // Etiqueta institucional argentina para las Islas Malvinas.
+  malvinasLabelMarker=L.marker([-51.72,-59.25],{
+   interactive:false,
+   keyboard:false,
+   zIndexOffset:1000,
+   icon:L.divIcon({
+    className:'malvinas-label-wrap',
+    html:'<div class="malvinas-label">Islas Malvinas</div><div class="malvinas-dot"></div>',
+    iconSize:[128,42],
+    iconAnchor:[64,20]
+   })
+  }).addTo(providerMapInstance);
  }
  setTimeout(()=>providerMapInstance.invalidateSize(),100);
  renderProviderMapMarkers();
