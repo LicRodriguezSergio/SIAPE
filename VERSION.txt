@@ -1,6 +1,2 @@
 SIGAP
-Versión de prueba: 3.4.1-MALVINAS
-Base: V3.4.0 oficial + Mapa Prestacional demostrativo
-Datos cartográficos: OpenStreetMap
-Datos de prestadores: ficticios para demostración
-Fecha: 2026-08-04
+Versión demostrativa: 3.4.2 - Mapa Prestacional Nacional (Islas Malvinas) + Seguimiento de Desvíos

@@ -19,3 +19,9 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Ficha desplegable por prestador.
 - Filtros por provincia, complejidad y nivel de riesgo.
 - KPIs de cápitas, IIRS y prestadores en rojo.
+
+
+## V3.4.2 integrada
+- Conserva el módulo Seguimiento.
+- Cambia el encabezado a “Mapa Prestacional Nacional / República Argentina”.
+- Incorpora la etiqueta visible “Islas Malvinas” sobre la cartografía.

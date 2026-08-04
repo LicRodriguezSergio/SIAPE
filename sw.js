@@ -1,4 +1,4 @@
-const CACHE='sigap-v3-4-1-mapa-malvinas';
+const CACHE='sigap-v342-mapa-malvinas-seguimiento';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./data.js','./manifest.json','./firebase-config.js','./pami-logo.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
