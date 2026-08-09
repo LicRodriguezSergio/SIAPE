@@ -1,6 +1,6 @@
 {
-  "name": "SIGAP · Mapa Prestacional de prueba",
-  "short_name": "SIGAP",
+  "name": "SIAPE GAP · Laboratorio de prueba",
+  "short_name": "SIAPE GAP",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7f9",

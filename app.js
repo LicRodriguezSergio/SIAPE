@@ -873,7 +873,7 @@ function localAuthorization(email){
  try{return JSON.parse(localStorage.getItem(LOCAL_AUTH_PREFIX+normalizeEmail(email))||'null')}catch{return null}
 }
 function saveLocalAuthorization(profile){
- localStorage.setItem(LOCAL_AUTH_PREFIX+normalizeEmail(profile.correo),JSON.stringify({correo:normalizeEmail(profile.correo),nombre:profile.nombre||'',apellido:profile.apellido||'',rol:profile.rol||'auditor',estado:'autorizado',validatedAt:new Date().toISOString()}));
+ localStorage.setItem(LOCAL_AUTH_PREFIX+normalizeEmail(profile.correo),JSON.stringify({correo:normalizeEmail(profile.correo),nombre:profile.nombre||'',apellido:profile.apellido||'',rol:profile.rol||'auditor',especialidad:profile.especialidad||'',estado:'autorizado',validatedAt:new Date().toISOString()}));
 }
 function clearLocalAuthorization(email){localStorage.removeItem(LOCAL_AUTH_PREFIX+normalizeEmail(email))}
 async function validateAuthorizedUser(user){
@@ -1055,6 +1055,7 @@ function lockApplication(){
  document.getElementById('executiveNav')?.classList.add('hide');
  document.getElementById('providerMapNav')?.classList.add('hide');
  document.getElementById('followupNav')?.classList.add('hide');
+ document.getElementById('laboratoryNav')?.classList.add('hide');
 }
 function unlockApplication(){
  const gate=document.getElementById('authGate');gate?.classList.add('auth-success');
@@ -1064,7 +1065,7 @@ function unlockApplication(){
  document.getElementById('executiveNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
  document.getElementById('providerMapNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
  document.getElementById('followupNav')?.classList.toggle('hide',!isManagementRole(currentSessionUser?.role));
- applyProfileToAudit();renderUserDashboard();
+ applyProfileToAudit();applySpecialtyVisibility();renderUserDashboard();
 }
 async function siapeLogin(){
  const email=normalizeEmail(document.getElementById('loginEmail').value),password=document.getElementById('loginPassword').value;
@@ -1115,7 +1116,10 @@ function renderAdminUsers(){
  el.innerHTML=list.map(u=>{
   const email=normalizeEmail(u.correo||u.id),self=email===normalizeEmail(currentSessionUser?.email),primary=normalizeEmail(currentSessionUser?.email)===PRIMARY_ADMIN_EMAIL;
   const roleOptions=['auditor','gerente','subgerente','jefa_medicas','jefa_sociales','administrador'].map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${roleLabel(r)}</option>`).join('');
-  return `<div class="admin-user-card"><div class="admin-user-head"><div><div class="admin-user-name">${esc(`${u.nombre||''} ${u.apellido||''}`.trim()||email)}</div><div class="admin-user-meta">${esc(email)}<br>Rol: ${esc(roleLabel(u.rol||'auditor'))}</div></div><span class="user-state user-state-${esc(u.estado||'pendiente')}">${esc(u.estado||'pendiente')}</span></div><div class="admin-user-actions">${u.estado!=='autorizado'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Autorizar</button>`:''}${u.estado!=='rechazado'?`<button class="secondary" onclick="setUserStatus('${esc(email)}','rechazado')">Rechazar</button>`:''}${u.estado==='autorizado'&&!self?`<button class="danger" onclick="setUserStatus('${esc(email)}','suspendido')">Suspender</button>`:''}${u.estado==='suspendido'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Reactivar</button>`:''}${!self?`<button class="danger" onclick="deleteUserRecord('${esc(email)}')">Eliminar registro</button>`:''}</div>${primary?`<div class="role-editor"><label>Rol</label><select id="role-${safeDomId(email)}">${roleOptions}</select><button class="secondary" onclick="setUserRole('${esc(email)}')">Guardar rol</button></div>`:''}</div>`;
+  const specialtyOptions=[
+   ['','Sin asignar'],['laboratorio','Laboratorio / Bioquímica'],['enfermeria','Enfermería'],['medica','Área Médica'],['imagenes','Diagnóstico por Imágenes'],['hemoterapia','Hemoterapia'],['nutricion','Nutrición'],['administracion','Administración / Legal'],['sociales','Área Social']
+  ].map(([v,l])=>`<option value="${v}" ${String(u.especialidad||'')===v?'selected':''}>${l}</option>`).join('');
+  return `<div class="admin-user-card"><div class="admin-user-head"><div><div class="admin-user-name">${esc(`${u.nombre||''} ${u.apellido||''}`.trim()||email)}</div><div class="admin-user-meta">${esc(email)}<br>Rol: ${esc(roleLabel(u.rol||'auditor'))}<br>Especialidad: ${esc(labSpecialtyLabel(u.especialidad))}</div></div><span class="user-state user-state-${esc(u.estado||'pendiente')}">${esc(u.estado||'pendiente')}</span></div><div class="admin-user-actions">${u.estado!=='autorizado'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Autorizar</button>`:''}${u.estado!=='rechazado'?`<button class="secondary" onclick="setUserStatus('${esc(email)}','rechazado')">Rechazar</button>`:''}${u.estado==='autorizado'&&!self?`<button class="danger" onclick="setUserStatus('${esc(email)}','suspendido')">Suspender</button>`:''}${u.estado==='suspendido'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Reactivar</button>`:''}${!self?`<button class="danger" onclick="deleteUserRecord('${esc(email)}')">Eliminar registro</button>`:''}</div><div class="role-editor"><label>Especialidad operativa</label><select id="specialty-${safeDomId(email)}">${specialtyOptions}</select><button class="secondary" onclick="setUserSpecialty('${esc(email)}')">Guardar especialidad</button></div>${primary?`<div class="role-editor"><label>Rol</label><select id="role-${safeDomId(email)}">${roleOptions}</select><button class="secondary" onclick="setUserRole('${esc(email)}')">Guardar rol</button></div>`:''}</div>`;
  }).join('');
 }
 function roleLabel(role){return({administrador:'Administrador',gerente:'Gerente',subgerente:'Subgerente',jefa_medicas:'Jefa Departamento Médicas',jefa_sociales:'Jefa Departamento Sociales',auditor:'Auditor'})[role]||role}

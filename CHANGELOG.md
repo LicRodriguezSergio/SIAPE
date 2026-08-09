@@ -25,3 +25,10 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Conserva el módulo Seguimiento.
 - Cambia el encabezado a “Mapa Prestacional Nacional / República Argentina”.
 - Incorpora la etiqueta visible “Islas Malvinas” sobre la cartografía.
+
+## 3.4.3 - Laboratorio (prueba)
+- Se incorpora solapa LABORATORIO con Guía II Nivel.
+- Se agrega especialidad operativa del auditor y restricción visual por especialidad.
+- Laboratorio permite elegir desvío estandarizado o redactar uno propio.
+- Se conservan antecedentes de observaciones vinculadas.
+- Se incorpora la matriz de riesgo del equipo de Laboratorio como metodología preliminar, sin modificarla.
