@@ -35,7 +35,7 @@ function isLaboratoryOnlyAuditor(){
 }
 function labSpecialtyLabel(v){
   const x=String(v||'').toLowerCase();
-  return ({laboratorio:'Laboratorio / Bioquímica',enfermeria:'Enfermería',medica:'Área Médica',imagenes:'Diagnóstico por Imágenes',hemoterapia:'Hemoterapia',nutricion:'Nutrición',administracion:'Administración / Legal',sociales:'Área Social'})[x]||'Sin asignar';
+  return ({laboratorio:'Laboratorio / Bioquímica',enfermeria:'Enfermería',medica:'Médica',farmacia:'Farmacia',imagenes:'Imágenes',psicologia:'Psicología / Salud Mental',hemoterapia:'Hemoterapia',nutricion:'Nutrición',administracion:'Administración',sociales:'Social'})[x]||'Sin asignar';
 }
 function applySpecialtyVisibility(){
   const labNav=document.getElementById('laboratoryNav');

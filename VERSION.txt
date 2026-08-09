@@ -1,3 +1,1 @@
-SIAPE GAP V3.4.4
-Área Enfermería + Laboratorio con matriz de riesgo dinámica
-09/08/2026
+SIAPE GAP V3.4.5 - Organización por áreas profesionales
