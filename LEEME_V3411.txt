@@ -1,0 +1,7 @@
+SIAPE GAP V3.4.11
+
+- Entrevista y notas se integra dentro de Área Enfermería.
+- Resumen y acta se integra dentro de Área Enfermería.
+- Plan de mejora se integra dentro de Área Enfermería.
+- Se eliminan esas tres opciones de la navegación principal.
+- Se conserva el flujo y la funcionalidad existente de Laboratorio, PDF, Seguimiento y resto del sistema.
