@@ -24,7 +24,14 @@ function ensureLabState(){
   labState.interview={...labDefaultState().interview,...(labState.interview||{})};
   labState.plan=labState.plan||{};
 }
-function saveLabState(){ensureLabState();localStorage.setItem(LAB_KEY,JSON.stringify(labState))}
+function saveLabState(){
+  ensureLabState();
+  localStorage.setItem(LAB_KEY,JSON.stringify(labState));
+  // Mantiene sincronizados el panel general, el Informe PDF general y Seguimiento.
+  try{if(typeof renderDashboard==='function')renderDashboard();}catch(e){console.warn('No se pudo actualizar el panel consolidado',e)}
+  try{if(typeof renderReport==='function')renderReport();}catch(e){console.warn('No se pudo actualizar el informe general',e)}
+  try{if(typeof renderFollowupModule==='function'&&document.getElementById('followupPage')?.classList.contains('active'))renderFollowupModule();}catch(e){console.warn('No se pudo actualizar Seguimiento',e)}
+}
 function labAnswer(code){
   return labState.answers[code]||{response:'',observation:'',suggestedIndex:0,customDeviation:'',deviationChoice:'suggested'};
 }
@@ -317,6 +324,30 @@ function labReportData(){
     return {code:i.code,section:i.section,item:i.item,observation:a.observation||'',deviation:labSelectedDeviation(i,a),criticality:labSuggestedCriticality(i,a)}
   });
 }
+
+function labSameProviderAsGeneral(){
+  const a=normalizeSearch?.(labState?.meta?.prestador||'')||String(labState?.meta?.prestador||'').toLowerCase().trim();
+  const b=normalizeSearch?.(state?.meta?.prestador||'')||String(state?.meta?.prestador||'').toLowerCase().trim();
+  return !!a&&!!b&&a===b;
+}
+function labGeneralReportSection(){
+  if(!labSameProviderAsGeneral())return '';
+  const m=labAreaMetrics(),ds=labReportData();
+  const interview=labState.interview||{};
+  const interviewText=[interview.interviewees&&`Entrevistado/s: ${interview.interviewees}`,interview.roles&&`Cargo/función: ${interview.roles}`,interview.summary&&`Síntesis: ${interview.summary}`].filter(Boolean).join(' · ');
+  return `<section class="report-section"><h1>ÁREA LABORATORIO</h1><table><tr><th>Requisitos evaluados</th><th>Desvíos</th><th>Bajo</th><th>Moderado</th><th>Alto/crítico</th><th>Cumplimiento</th><th>IIRS</th></tr><tr><td>${m.active}</td><td>${m.dev}</td><td>${m.low}</td><td>${m.mod}</td><td>${m.high}</td><td>${(m.compliance*100).toFixed(1)}%</td><td>${m.iirs.toFixed(2)}</td></tr></table>${interviewText?`<p><b>Entrevista:</b> ${esc(interviewText)}</p>`:''}<h2>Resumen ejecutivo</h2><p>${esc(labExecutiveText())}</p><h2>Síntesis para el acta</h2><p>${esc(labActText())}</p><h2>Desvíos de Laboratorio</h2>${ds.length?ds.map(d=>`<div class="deviation-block"><h4>${esc(d.code)} · ${esc(d.section)}</h4><p><b>Requisito:</b> ${esc(d.item)}</p>${d.observation?`<p><b>Observación:</b> ${esc(d.observation)}</p>`:''}<p><b>Desvío seleccionado:</b> ${esc(d.deviation||'Pendiente de redacción')}</p>${d.criticality!=='—'?`<p><b>Criticidad de referencia:</b> ${esc(d.criticality)}</p>`:''}</div>`).join(''):'<p>No se registraron desvíos en Laboratorio.</p>'}</section>`;
+}
+window.labGeneralReportSection=labGeneralReportSection;
+function labFollowupDeviations(){
+  if(!labSameProviderAsGeneral())return [];
+  return labReportData().map(d=>{
+    const item=(window.LAB_GUIDE_ITEMS||[]).find(i=>i.code===d.code);
+    const p=labPlanFor(d.code);
+    const risk=item?labItemIIRS(item):3;
+    return {id:d.code,area:'Laboratorio',service:d.section||'Laboratorio',risk,deviation:d.deviation||d.item,recommendation:p.action||'Subsanar el desvío detectado y acreditar la regularización conforme al requisito auditado.',evidence:p.evidence||'Documentación y/o evidencia objetiva que permita verificar la subsanación.',deadline:p.deadline||'A definir por Seguimiento',status:'pendiente',followupNote:'',source:'laboratorio'};
+  });
+}
+window.labFollowupDeviations=labFollowupDeviations;
 function renderLabReportPreview(){
   const root=document.getElementById('labReportPreview');if(!root)return;
   const ds=labReportData();

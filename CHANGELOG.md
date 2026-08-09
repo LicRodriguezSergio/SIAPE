@@ -1,3 +1,10 @@
+# SIAPE GAP V3.4.9
+
+- Área Laboratorio integrada al Informe PDF general y consolidado del prestador.
+- El Informe PDF se actualiza automáticamente mientras se cargan datos de Laboratorio.
+- Los desvíos de Laboratorio se incorporan automáticamente al módulo Seguimiento junto con los demás desvíos del prestador.
+- Se conservan estados y observaciones de seguimiento de la auditoría actual en el dispositivo.
+
 # SIAPE GAP V3.4.8
 
 - El Panel General del Área Laboratorio incorpora Resumen Ejecutivo automático.
