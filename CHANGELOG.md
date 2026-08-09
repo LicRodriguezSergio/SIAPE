@@ -41,3 +41,10 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Laboratorio permite elegir desvío estandarizado o redactar uno propio.
 - Se conservan antecedentes de observaciones vinculadas.
 - Se incorpora la matriz de riesgo del equipo de Laboratorio como metodología preliminar, sin modificarla.
+
+## V3.4.6
+- Panel general propio del Área Laboratorio.
+- Entrevista y notas específicas de Laboratorio.
+- Desvíos estandarizados ampliados con antecedentes vinculados del Excel y opción de redacción propia.
+- Pestaña activa resaltada.
+- Mapa circular multinivel de riesgo dinámico (proceso, subproceso y requisito).

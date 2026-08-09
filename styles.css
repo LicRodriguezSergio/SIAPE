@@ -188,3 +188,12 @@ body:not(.locked) main,body:not(.locked) header{animation:siapeEnter .5s ease bo
 .lab-risk-response span{font-size:11px;color:var(--muted,#667085)}
 .lab-risk-manual{min-width:120px;padding:6px 8px}
 @media(max-width:720px){.lab-process-row{grid-template-columns:1fr 52px}.lab-process-label{grid-column:1/-1}.lab-risk-title-row{display:block}.lab-risk-title-row .badge{display:inline-block;margin-top:6px}}
+
+/* V3.4.6 · Área Laboratorio */
+.lab-area-tabs .lab-tab.active{box-shadow:0 0 0 3px rgba(18,61,90,.18);transform:translateY(-1px)}
+.lab-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px}
+.lab-progress-track{height:14px;background:#e7eef2;border-radius:999px;overflow:hidden;margin-top:16px}.lab-progress-fill{height:100%;background:#236b8e;border-radius:999px;transition:width .25s}
+.lab-sunburst{max-width:620px;margin:8px auto}.lab-sunburst svg{width:100%;height:auto;display:block}.lab-sun-segment{cursor:pointer;transition:opacity .15s,filter .15s}.lab-sun-segment:hover{filter:brightness(.92);stroke:#17394c;stroke-width:2}
+.lab-sun-legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}.lab-sun-legend span{display:flex;align-items:center;gap:6px;font-size:12px}.lab-sun-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}.lab-sunburst-detail{text-align:center;padding:10px;background:#f5f8fa;border-radius:8px;margin-top:8px}
+#labInterviewView textarea{width:100%;margin-bottom:12px}
+@media(max-width:760px){.lab-quick-grid{grid-template-columns:1fr 1fr}}

@@ -9,7 +9,8 @@ function labDefaultState(){
     meta:{reportNumber:'',reportYear:String(new Date().getFullYear()),prestador:'',cuit:'',province:'',ugl:'',address:'',level:'II',date:new Date().toISOString().slice(0,10),auditor:''},
     answers:{},
     riskManual:{},
-    view:'guide'
+    interview:{date:new Date().toISOString().slice(0,10),time:'',place:'',area:'',interviewees:'',roles:'',license:'',auditors:'',summary:'',documents:'',notes:''},
+    view:'panel'
   };
 }
 function loadLabState(){
@@ -19,6 +20,7 @@ function ensureLabState(){
   labState.meta={...labDefaultState().meta,...(labState.meta||{})};
   labState.answers=labState.answers||{};
   labState.riskManual=labState.riskManual||{};
+  labState.interview={...labDefaultState().interview,...(labState.interview||{})};
 }
 function saveLabState(){ensureLabState();localStorage.setItem(LAB_KEY,JSON.stringify(labState))}
 function labAnswer(code){
@@ -67,14 +69,17 @@ function renderLaboratoryModule(){
     const k=el.dataset.labMeta;
     if(document.activeElement!==el)el.value=labState.meta[k]||'';
   });
-  labShowView(labState.view||'guide',false);
+  labShowView(labState.view||'panel',false);
   renderLabStats();
 }
 function labShowView(view,saveView=true){
   labState.view=view;if(saveView)saveLabState();
   document.querySelectorAll('.lab-subview').forEach(el=>el.classList.add('hide'));
-  document.getElementById(view==='risk'?'labRiskView':view==='report'?'labReportView':'labGuideView')?.classList.remove('hide');
-  document.querySelectorAll('.lab-tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  const map={panel:'labPanelView',interview:'labInterviewView',guide:'labGuideView',risk:'labRiskView',report:'labReportView'};
+  document.getElementById(map[view]||'labPanelView')?.classList.remove('hide');
+  document.querySelectorAll('.lab-tab').forEach(b=>{const on=b.dataset.view===view;b.classList.toggle('active',on);b.classList.toggle('primary',on);b.classList.toggle('secondary',!on)});
+  if(view==='panel')renderLabPanel();
+  if(view==='interview')renderLabInterview();
   if(view==='guide')renderLabGuide();
   if(view==='risk')renderLabRiskMatrix();
   if(view==='report')renderLabReportPreview();
@@ -86,9 +91,14 @@ function updateLabMeta(el){
 }
 function labResponseLabel(v){return ({SI:'Cumple',NO:'Desvío',NA:'No aplica',NE:'No evaluado'})[v]||'Pendiente'}
 function labCriterionDefaultDeviation(item){return `No se acredita el cumplimiento del criterio: ${item.item}.`}
+function labStandardDeviations(item){
+  const coded=(item.suggestions||[]).map(x=>({kind:'coded',code:x.code,text:x.text,criticality:x.criticality||'',category:x.category||''}));
+  const historical=(item.examples||[]).map((x,i)=>({kind:'historical',code:'ANT-'+String(i+1).padStart(2,'0'),text:x,criticality:'',category:'Antecedente'}));
+  const seen=new Set();return [...coded,...historical].filter(x=>{const k=String(x.text||'').trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true});
+}
 function labSelectedDeviation(item,a){
   if(a.response!=='NO')return '';
-  const suggestions=item.suggestions||[];
+  const suggestions=labStandardDeviations(item);
   if(!suggestions.length)return String(a.customDeviation||'').trim();
   const s=suggestions[Number(a.suggestedIndex)||0];
   if(a.deviationChoice==='custom')return String(a.customDeviation||'').trim();
@@ -122,7 +132,7 @@ function renderLabGuide(){
 }
 function labItemHtml(item){
   const a=labAnswer(item.code), no=a.response==='NO';
-  const suggestions=item.suggestions||[];
+  const suggestions=labStandardDeviations(item);
   const selected=Number(a.suggestedIndex)||0;
   const choice=a.deviationChoice||'suggested';
   return `<article class="lab-item ${no?'lab-item-deviation':''}" data-lab-code="${esc(item.code)}">
@@ -134,10 +144,10 @@ function labItemHtml(item){
     <textarea rows="2" data-lab-field="observation" placeholder="Describa lo observado...">${esc(a.observation||'')}</textarea>
     ${no?`<div class="lab-deviation-box">
       <h4>Desvío para el informe</h4>
-      ${suggestions.length?`<label class="lab-choice"><input type="radio" name="dev-${safeDomId(item.code)}" data-lab-field="deviationChoice" value="suggested" ${choice!=='custom'?'checked':''}> Usar desvío sugerido por la matriz de Laboratorio</label>
-      <select data-lab-field="suggestedIndex">${suggestions.map((s,idx)=>`<option value="${idx}" ${idx===selected?'selected':''}>${esc(s.code)} · ${esc(s.text)}${s.criticality?' · '+esc(s.criticality):''}</option>`).join('')}</select>`:
+      ${suggestions.length?`<label class="lab-choice"><input type="radio" name="dev-${safeDomId(item.code)}" data-lab-field="deviationChoice" value="suggested" ${choice!=='custom'?'checked':''}> Usar observación/desvío estandarizado del material de Laboratorio</label>
+      <select data-lab-field="suggestedIndex">${suggestions.map((s,idx)=>`<option value="${idx}" ${idx===selected?'selected':''}>${s.kind==='historical'?'Antecedente estandarizado':esc(s.code)} · ${esc(s.text)}${s.criticality?' · '+esc(s.criticality):''}</option>`).join('')}</select>`:
       `<div class="notice">Este criterio no tiene todavía un desvío estandarizado vinculado en el archivo recibido. Puede redactarse un desvío propio sin alterar el criterio original.</div>`}
-      <label class="lab-choice"><input type="radio" name="dev-${safeDomId(item.code)}" data-lab-field="deviationChoice" value="custom" ${choice==='custom'||!suggestions.length?'checked':''}> Redactar desvío propio</label>
+      <label class="lab-choice"><input type="radio" name="dev-${safeDomId(item.code)}" data-lab-field="deviationChoice" value="custom" ${choice==='custom'||!suggestions.length?'checked':''}> Omitir el estandarizado y redactar observación/desvío propio</label>
       <textarea rows="3" data-lab-field="customDeviation" placeholder="Escriba el desvío tal como desea que figure en el informe...">${esc(a.customDeviation||'')}</textarea>
       <div class="lab-final-deviation"><b>Desvío seleccionado:</b> ${esc(labSelectedDeviation(item,{...a,deviationChoice:(!suggestions.length?'custom':choice)}))||'<em>Pendiente de redacción</em>'}</div>
       ${item.examples?.length?`<details class="lab-history"><summary>Ver antecedentes de observaciones vinculadas (${item.examples.length})</summary><ul>${item.examples.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
@@ -226,6 +236,37 @@ function renderLabRiskDashboard(){
   const heat=document.getElementById('labRiskHeatmap');
   if(heat){const top=[...findings].sort((a,b)=>(labRiskCurrent(b)||0)-(labRiskCurrent(a)||0)).slice(0,12);heat.innerHTML=top.length?top.map(r=>`<div class="lab-heat-row ${labRiskClass(r)}"><span class="lab-heat-id">${esc(r.id)}</span><span class="lab-heat-item">${esc(r.item)}</span><b>${(labRiskCurrent(r)||0).toFixed(2)}</b></div>`).join(''):'<div class="notice">Los hallazgos aparecerán aquí cuando se registren respuestas NO.</div>';}
 }
+
+function renderLabPanel(){
+  ensureLabState();renderLabStats();
+  const items=window.LAB_GUIDE_ITEMS||[], ans=labState.answers||{};
+  const yes=items.filter(i=>(ans[i.code]||{}).response==='SI').length,no=items.filter(i=>(ans[i.code]||{}).response==='NO').length;
+  const evald=items.filter(i=>['SI','NO','NA','NE'].includes((ans[i.code]||{}).response)).length;
+  const pct=items.length?Math.round(evald/items.length*100):0;
+  const interview=labState.interview||{}, hasInterview=Boolean(interview.interviewees||interview.summary||interview.roles);
+  const k=document.getElementById('labPanelKpis');if(k)k.innerHTML=`<div class="kpi"><span>Avance</span><b>${pct}%</b></div><div class="kpi"><span>Cumple</span><b>${yes}</b></div><div class="kpi"><span>Desvíos</span><b>${no}</b></div><div class="kpi"><span>Entrevista</span><b>${hasInterview?'Registrada':'Pendiente'}</b></div>`;
+  const p=document.getElementById('labPanelProgress');if(p)p.innerHTML=`<div class="lab-progress-track"><div class="lab-progress-fill" style="width:${pct}%"></div></div><p class="small">${evald} de ${items.length} requisitos con respuesta.</p>`;
+  const st=document.getElementById('labPanelStatus');if(st)st.innerHTML=`<p><b>Prestador:</b> ${esc(labState.meta.prestador||'Sin completar')}</p><p><b>Auditor/a:</b> ${esc(labState.meta.auditor||currentSessionUser?.displayName||'')}</p><p><b>Entrevistado/a:</b> ${esc(interview.interviewees||'Pendiente')}</p><p><b>Estado:</b> ${pct===100?'Guía completa':'Auditoría en curso'}</p>`;
+}
+function renderLabInterview(){
+  ensureLabState();if(!labState.interview.auditors)labState.interview.auditors=labState.meta.auditor||currentSessionUser?.displayName||'';
+  document.querySelectorAll('[data-lab-interview]').forEach(el=>{const k=el.dataset.labInterview;if(document.activeElement!==el)el.value=labState.interview[k]||'';el.oninput=()=>{labState.interview[k]=el.value;saveLabState();};});
+}
+function labSaveInterview(){document.querySelectorAll('[data-lab-interview]').forEach(el=>labState.interview[el.dataset.labInterview]=el.value);saveLabState();renderLabPanel();alert('Entrevista de Laboratorio guardada.')}
+function labClearInterview(){if(!confirm('¿Limpiar el registro de entrevista de Laboratorio?'))return;labState.interview={...labDefaultState().interview,auditors:labState.meta.auditor||currentSessionUser?.displayName||''};saveLabState();renderLabInterview();}
+function labPolar(cx,cy,r,a){const x=cx+r*Math.cos((a-90)*Math.PI/180),y=cy+r*Math.sin((a-90)*Math.PI/180);return [x,y]}
+function labArcPath(cx,cy,r0,r1,a0,a1){const p1=labPolar(cx,cy,r1,a0),p2=labPolar(cx,cy,r1,a1),p3=labPolar(cx,cy,r0,a1),p4=labPolar(cx,cy,r0,a0),large=(a1-a0)>180?1:0;return `M${p1[0]},${p1[1]} A${r1},${r1} 0 ${large} 1 ${p2[0]},${p2[1]} L${p3[0]},${p3[1]} A${r0},${r0} 0 ${large} 0 ${p4[0]},${p4[1]} Z`;}
+function renderLabSunburst(){
+  const host=document.getElementById('labRiskSunburst');if(!host)return;const rows=window.LAB_RISK_MATRIX||[];
+  const procNames=[...new Set(rows.map(r=>r.proceso).filter(Boolean))];let current='';const normalized=rows.map(r=>{if(r.proceso)current=r.proceso;return {...r,_proc:current,_risk:labRiskCurrent(r)||0}});
+  const colors={'PREANALÍTICO':'#8db8ee','ANALÍTICO':'#ef8d84','POSTANALÍTICO':'#a9d77b','APOYO':'#b9a0dc'};
+  const totalWeight=normalized.reduce((a,r)=>a+Math.max(r._risk,0.15),0)||1;let angle=0;const cx=250,cy=250;let paths=[];
+  for(const proc of procNames){const pr=normalized.filter(r=>r._proc===proc),pw=pr.reduce((a,r)=>a+Math.max(r._risk,0.15),0),pa0=angle,pa1=angle+360*pw/totalWeight;paths.push(`<path d="${labArcPath(cx,cy,55,120,pa0,pa1)}" fill="${colors[proc]||'#9fb3c8'}" fill-opacity=".75" stroke="white" stroke-width="2"><title>${esc(proc)}</title></path>`);
+    let sa=pa0;const subs=[...new Set(pr.map(r=>r.subproceso))];for(const sub of subs){const sr=pr.filter(r=>r.subproceso===sub),sw=sr.reduce((a,r)=>a+Math.max(r._risk,0.15),0),s1=sa+360*sw/totalWeight;paths.push(`<path d="${labArcPath(cx,cy,122,185,sa,s1)}" fill="${colors[proc]||'#9fb3c8'}" fill-opacity=".55" stroke="white" stroke-width="1.5" class="lab-sun-segment" onclick="labSunDetail('${String(proc).replace(/'/g,"\'")}','${String(sub).replace(/'/g,"\'")}','',${sr.reduce((a,r)=>a+r._risk,0).toFixed(2)})"><title>${esc(proc)} · ${esc(sub)}</title></path>`);let ia=sa;for(const r of sr){const iw=Math.max(r._risk,0.15),i1=ia+360*iw/totalWeight;const opacity=r._risk>0?.88:.22;paths.push(`<path d="${labArcPath(cx,cy,187,238,ia,i1)}" fill="${colors[proc]||'#9fb3c8'}" fill-opacity="${opacity}" stroke="white" stroke-width="1" class="lab-sun-segment" onclick="labSunDetail('${String(proc).replace(/'/g,"\'")}','${String(sub).replace(/'/g,"\'")}','${String(r.item).replace(/'/g,"\'")}',${r._risk.toFixed(2)})"><title>${esc(r.item)} · Riesgo actual ${r._risk.toFixed(2)}</title></path>`);ia=i1;}sa=s1;}angle=pa1;}
+  host.innerHTML=`<svg viewBox="0 0 500 500" role="img" aria-label="Mapa circular dinámico de riesgo de Laboratorio">${paths.join('')}<circle cx="250" cy="250" r="52" fill="white"/><text x="250" y="244" text-anchor="middle" font-size="15" font-weight="700" fill="#17394c">LABORATORIO</text><text x="250" y="266" text-anchor="middle" font-size="12" fill="#667085">Riesgo dinámico</text></svg><div class="lab-sun-legend">${procNames.map(p=>`<span><i style="background:${colors[p]||'#9fb3c8'}"></i>${esc(p)}</span>`).join('')}</div>`;
+}
+function labSunDetail(proc,sub,item,risk){const el=document.getElementById('labSunburstDetail');if(el)el.innerHTML=`<b>${esc(proc)}</b>${sub?' · '+esc(sub):''}${item?' · '+esc(item):''} — Riesgo actual: <b>${Number(risk).toFixed(2)}</b>`;}
+
 function labSetRiskManual(id,value){
   ensureLabState();labState.riskManual[id]=value;saveLabState();renderLabRiskMatrix();
 }
@@ -238,7 +279,7 @@ function renderLabRiskMatrix(){
     const responseUi=linked?`<div class="lab-risk-response"><b>${esc(labRiskResponseText(response))}</b><span>Guía: ${esc(linked.code)}</span></div>`:`<select class="lab-risk-manual" onchange="labSetRiskManual(${Number(r.id)},this.value)"><option value="" ${!response?'selected':''}>Pendiente</option><option value="SI" ${response==='SI'?'selected':''}>Cumple</option><option value="NO" ${response==='NO'?'selected':''}>No cumple</option><option value="NA" ${response==='NA'?'selected':''}>No aplica</option><option value="NE" ${response==='NE'?'selected':''}>No evaluado</option></select>`;
     return `<tr class="${labRiskClass(r)}"><td>${esc(r.id)}</td><td>${esc(r.proceso)}</td><td>${esc(r.subproceso)}</td><td>${esc(r.area)}</td><td>${esc(r.item)}</td><td>${esc(r.normativa)}</td><td>${responseUi}</td><td>${esc(r.incumplimiento)}</td><td>${esc(r.impacto)}</td><td>${esc(r.peso)}</td><td>${Number(r.riesgo).toFixed(2)}</td><td><b>${current===null?'—':current.toFixed(2)}</b></td><td>${esc(labRiskCurrentLevel(r))}</td><td>${esc(current&&current>0?r.criticidad:'—')}</td></tr>`;
   }).join('');
-  renderLabRiskDashboard();
+  renderLabRiskDashboard();renderLabSunburst();
 }
 function labReportData(){
   const items=window.LAB_GUIDE_ITEMS||[];

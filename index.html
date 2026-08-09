@@ -198,8 +198,8 @@
 <section id="laboratoryPage" class="page">
   <div class="card lab-hero">
     <div>
-      <h2>Laboratorio · Guía de Auditoría</h2>
-      <p>Guía II Nivel incorporada respetando los archivos entregados por el equipo de Laboratorio. La metodología de riesgo se presenta como preliminar y sujeta a validación.</p>
+      <h2>Área Laboratorio</h2>
+      <p>Panel operativo del Área Laboratorio: identificación, entrevista, guía, desvíos, matriz dinámica de riesgo e informe.</p>
     </div>
     <span class="badge">Versión de prueba</span>
   </div>
@@ -218,21 +218,45 @@
       <div><label>Auditor/a</label><input data-lab-meta="auditor"></div>
     </div>
     <div id="labKpis" class="kpis lab-kpis"></div>
-    <div class="toolbar">
-      <button class="primary lab-tab active" data-view="guide" onclick="labShowView('guide')">Guía II Nivel</button>
+    <div class="toolbar lab-area-tabs">
+      <button class="primary lab-tab active" data-view="panel" onclick="labShowView('panel')">Panel general</button>
+      <button class="secondary lab-tab" data-view="interview" onclick="labShowView('interview')">Entrevista y notas</button>
+      <button class="secondary lab-tab" data-view="guide" onclick="labShowView('guide')">Guía II Nivel</button>
       <button class="secondary lab-tab" data-view="risk" onclick="labShowView('risk')">Matriz de riesgo</button>
       <button class="secondary lab-tab" data-view="report" onclick="labShowView('report')">Resumen / informe</button>
       <button class="savebtn" onclick="labSaveSnapshot()">💾 Guardar Laboratorio</button>
       <button class="secondary" onclick="labReset()">Nueva auditoría</button>
     </div>
   </div>
-  <div id="labGuideView" class="lab-subview"><div id="labGuideItems"></div></div>
+  <div id="labPanelView" class="lab-subview">
+    <div class="grid2">
+      <div class="card"><h3>Panel general · Área Laboratorio</h3><p class="small">Resumen exclusivo de la auditoría de Laboratorio.</p><div id="labPanelKpis" class="kpis"></div><div id="labPanelProgress" class="lab-panel-progress"></div></div>
+      <div class="card"><h3>Situación actual</h3><div id="labPanelStatus"></div></div>
+    </div>
+    <div class="card"><h3>Accesos del Área Laboratorio</h3><div class="lab-quick-grid"><button class="secondary" onclick="labShowView('interview')">Entrevista y notas</button><button class="secondary" onclick="labShowView('guide')">Abrir Guía II Nivel</button><button class="secondary" onclick="labShowView('risk')">Ver Matriz de riesgo</button><button class="secondary" onclick="labShowView('report')">Resumen / informe</button></div></div>
+  </div>
+  <div id="labInterviewView" class="lab-subview hide">
+    <div class="card"><h3>Entrevista y notas · Área Laboratorio</h3><p class="small">Registro propio del Área Laboratorio. Se conserva con esta auditoría.</p>
+      <div class="grid">
+        <div><label>Fecha</label><input type="date" data-lab-interview="date"></div><div><label>Hora</label><input type="time" data-lab-interview="time"></div>
+        <div><label>Lugar / modalidad</label><input data-lab-interview="place" placeholder="Laboratorio, oficina, entrevista presencial..."></div><div><label>Área / sector</label><input data-lab-interview="area" placeholder="Laboratorio general, bacteriología..."></div>
+        <div><label>Persona/s entrevistada/s</label><input data-lab-interview="interviewees" placeholder="Nombre y apellido"></div><div><label>Cargo / función</label><input data-lab-interview="roles" placeholder="Director/a técnico/a, bioquímico/a, técnico/a..."></div>
+        <div><label>Matrícula / identificación</label><input data-lab-interview="license"></div><div><label>Auditor/a del Área Laboratorio</label><input data-lab-interview="auditors"></div>
+      </div>
+      <label>Síntesis de la entrevista</label><textarea rows="4" data-lab-interview="summary" placeholder="Registre los aspectos relevantes de la entrevista..."></textarea>
+      <label>Documentación / evidencia mencionada</label><textarea rows="3" data-lab-interview="documents"></textarea>
+      <label>Observaciones adicionales del auditor</label><textarea rows="3" data-lab-interview="notes"></textarea>
+      <div class="toolbar"><button class="primary" onclick="labSaveInterview()">Guardar entrevista</button><button class="secondary" onclick="labClearInterview()">Limpiar entrevista</button></div>
+    </div>
+  </div>
+  <div id="labGuideView" class="lab-subview hide"><div id="labGuideItems"></div></div>
   <div id="labRiskView" class="lab-subview hide">
     <div class="card">
       <div class="lab-risk-title-row"><div><h2>Matriz de riesgo de Laboratorio</h2><p>Visualización dinámica basada en la Supermatriz entregada por el equipo de Laboratorio.</p></div><span class="badge">Metodología preliminar</span></div>
       <div class="notice"><b>Fórmula conservada:</b> Incumplimiento × Impacto × Peso (%) / 100. La respuesta de la guía actualiza la matriz: <b>SI = riesgo actual 0</b>; <b>NO = aplica el valor de incumplimiento definido en la matriz</b>. Los criterios aún no vinculados pueden evaluarse directamente en esta pantalla. La metodología queda sujeta a validación técnica.</div>
       <div id="labRiskKpis" class="kpis lab-risk-kpis"></div>
     </div>
+    <div class="card lab-sunburst-card"><div class="lab-risk-title-row"><div><h3>Mapa circular dinámico de riesgo</h3><p class="small">Basado en la estructura de la Supermatriz: proceso → subproceso → requisito. Se actualiza con las respuestas de los auditores.</p></div><button class="secondary" onclick="renderLabRiskMatrix()">Actualizar gráfico</button></div><div id="labRiskSunburst" class="lab-sunburst"></div><div id="labSunburstDetail" class="small lab-sunburst-detail">Seleccione un segmento para ver su detalle.</div></div>
     <div class="grid2 lab-risk-dashboard">
       <div class="card"><h3>Riesgo por proceso</h3><p class="small">Se recalcula según las respuestas cargadas en la auditoría.</p><div id="labRiskProcessChart" class="lab-process-chart"></div></div>
       <div class="card"><h3>Heatmap de hallazgos</h3><p class="small">Prioriza los requisitos con riesgo actual distinto de cero.</p><div id="labRiskHeatmap" class="lab-heatmap"></div></div>
