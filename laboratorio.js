@@ -10,6 +10,7 @@ function labDefaultState(){
     answers:{},
     riskManual:{},
     interview:{date:new Date().toISOString().slice(0,10),time:'',place:'',area:'',interviewees:'',roles:'',license:'',auditors:'',summary:'',documents:'',notes:''},
+    plan:{},
     view:'panel'
   };
 }
@@ -21,6 +22,7 @@ function ensureLabState(){
   labState.answers=labState.answers||{};
   labState.riskManual=labState.riskManual||{};
   labState.interview={...labDefaultState().interview,...(labState.interview||{})};
+  labState.plan=labState.plan||{};
 }
 function saveLabState(){ensureLabState();localStorage.setItem(LAB_KEY,JSON.stringify(labState))}
 function labAnswer(code){
@@ -75,13 +77,15 @@ function renderLaboratoryModule(){
 function labShowView(view,saveView=true){
   labState.view=view;if(saveView)saveLabState();
   document.querySelectorAll('.lab-subview').forEach(el=>el.classList.add('hide'));
-  const map={panel:'labPanelView',interview:'labInterviewView',guide:'labGuideView',risk:'labRiskView',report:'labReportView'};
+  const map={panel:'labPanelView',interview:'labInterviewView',guide:'labGuideView',risk:'labRiskView',summary:'labSummaryView',plan:'labPlanView',report:'labReportView'};
   document.getElementById(map[view]||'labPanelView')?.classList.remove('hide');
   document.querySelectorAll('.lab-tab').forEach(b=>{const on=b.dataset.view===view;b.classList.toggle('active',on);b.classList.toggle('primary',on);b.classList.toggle('secondary',!on)});
   if(view==='panel')renderLabPanel();
   if(view==='interview')renderLabInterview();
   if(view==='guide')renderLabGuide();
   if(view==='risk')renderLabRiskMatrix();
+  if(view==='summary')renderLabSummary();
+  if(view==='plan')renderLabPlan();
   if(view==='report')renderLabReportPreview();
 }
 function updateLabMeta(el){
@@ -109,16 +113,36 @@ function labSuggestedCriticality(item,a){
   const s=item.suggestions?.[Number(a.suggestedIndex)||0];
   return s?.criticality||'—';
 }
+function labLevelToIIRS(level){
+  const v=labNormText(level);
+  if(v.includes('crit'))return 5;
+  if(v.includes('alto'))return 4;
+  if(v.includes('moder'))return 3;
+  if(v.includes('bajo')||v.includes('menor'))return 2;
+  return 2;
+}
+function labItemIIRS(item){
+  const a=labAnswer(item.code);if(a.response!=='NO')return 0;
+  const linked=(window.LAB_RISK_MATRIX||[]).filter(r=>labRiskLinkedGuideItem(r)?.code===item.code);
+  if(linked.length)return Math.max(...linked.map(r=>labLevelToIIRS(r.nivel)));
+  const cr=labCriticalityRank(labSuggestedCriticality(item,a));return cr||3;
+}
+function labAreaMetrics(){
+  ensureLabState();const items=window.LAB_GUIDE_ITEMS||[],ans=labState.answers||{};
+  const applicable=items.filter(i=>['SI','NO'].includes((ans[i.code]||{}).response));
+  const yes=applicable.filter(i=>(ans[i.code]||{}).response==='SI');
+  const dev=applicable.filter(i=>(ans[i.code]||{}).response==='NO');
+  const scores=applicable.map(i=>labItemIIRS(i));
+  const compliance=applicable.length?yes.length/applicable.length:0;
+  const iirs=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
+  return {active:applicable.length,answered:items.filter(i=>['SI','NO','NA','NE'].includes((ans[i.code]||{}).response)).length,dev:dev.length,low:dev.filter(i=>labItemIIRS(i)<=2).length,mod:dev.filter(i=>labItemIIRS(i)===3).length,high:dev.filter(i=>labItemIIRS(i)>=4).length,compliance,iirs,yes:yes.length,total:items.length};
+}
+window.labAreaMetrics=labAreaMetrics;
+function labIirsBadge(v){const n=Number(v)||0;const band=n<=2?'Verde':n<4?'Moderado':'Alto';return `${n.toFixed(2)} · ${band}`;}
 function renderLabStats(){
-  const items=window.LAB_GUIDE_ITEMS||[], ans=labState.answers||{};
-  const evaluated=items.filter(i=>['SI','NO','NA'].includes((ans[i.code]||{}).response));
-  const no=items.filter(i=>(ans[i.code]||{}).response==='NO');
-  const yes=items.filter(i=>(ans[i.code]||{}).response==='SI');
-  const denom=yes.length+no.length;
-  const compliance=denom?Math.round(yes.length/denom*100):0;
-  const high=no.filter(i=>labCriticalityRank(labSuggestedCriticality(i,ans[i.code]||{}))>=4).length;
+  const m=labAreaMetrics();
   const el=document.getElementById('labKpis');
-  if(el)el.innerHTML=`<div class="kpi"><span>Requisitos</span><b>${items.length}</b></div><div class="kpi"><span>Evaluados</span><b>${evaluated.length}</b></div><div class="kpi"><span>Desvíos</span><b>${no.length}</b></div><div class="kpi"><span>Cumplimiento</span><b>${compliance}%</b></div><div class="kpi"><span>Alta/Crítica*</span><b>${high}</b></div>`;
+  if(el)el.innerHTML=`<div class="kpi"><span>Requisitos</span><b>${m.total}</b></div><div class="kpi"><span>Evaluados</span><b>${m.answered}</b></div><div class="kpi"><span>Desvíos</span><b>${m.dev}</b></div><div class="kpi"><span>Cumplimiento</span><b>${(m.compliance*100).toFixed(1)}%</b></div><div class="kpi"><span>IIRS</span><b>${m.iirs.toFixed(2)}</b></div>`;
 }
 function renderLabGuide(){
   const root=document.getElementById('labGuideItems');if(!root)return;
@@ -238,16 +262,21 @@ function renderLabRiskDashboard(){
 }
 
 function renderLabPanel(){
-  ensureLabState();renderLabStats();
-  const items=window.LAB_GUIDE_ITEMS||[], ans=labState.answers||{};
-  const yes=items.filter(i=>(ans[i.code]||{}).response==='SI').length,no=items.filter(i=>(ans[i.code]||{}).response==='NO').length;
-  const evald=items.filter(i=>['SI','NO','NA','NE'].includes((ans[i.code]||{}).response)).length;
-  const pct=items.length?Math.round(evald/items.length*100):0;
-  const interview=labState.interview||{}, hasInterview=Boolean(interview.interviewees||interview.summary||interview.roles);
-  const k=document.getElementById('labPanelKpis');if(k)k.innerHTML=`<div class="kpi"><span>Avance</span><b>${pct}%</b></div><div class="kpi"><span>Cumple</span><b>${yes}</b></div><div class="kpi"><span>Desvíos</span><b>${no}</b></div><div class="kpi"><span>Entrevista</span><b>${hasInterview?'Registrada':'Pendiente'}</b></div>`;
-  const p=document.getElementById('labPanelProgress');if(p)p.innerHTML=`<div class="lab-progress-track"><div class="lab-progress-fill" style="width:${pct}%"></div></div><p class="small">${evald} de ${items.length} requisitos con respuesta.</p>`;
-  const st=document.getElementById('labPanelStatus');if(st)st.innerHTML=`<p><b>Prestador:</b> ${esc(labState.meta.prestador||'Sin completar')}</p><p><b>Auditor/a:</b> ${esc(labState.meta.auditor||currentSessionUser?.displayName||'')}</p><p><b>Entrevistado/a:</b> ${esc(interview.interviewees||'Pendiente')}</p><p><b>Estado:</b> ${pct===100?'Guía completa':'Auditoría en curso'}</p>`;
+  ensureLabState();renderLabStats();const m=labAreaMetrics();
+  const panelExec=document.getElementById('labPanelExecutiveSummary');if(panelExec)panelExec.textContent=labExecutiveText();
+  const panelAct=document.getElementById('labPanelActSummary');if(panelAct)panelAct.textContent=labActText();
+  const pct=m.total?Math.round(m.answered/m.total*100):0;const interview=labState.interview||{},hasInterview=Boolean(interview.interviewees||interview.summary||interview.roles);
+  const k=document.getElementById('labPanelKpis');if(k)k.innerHTML=`<div class="kpi"><span>Desvíos</span><b>${m.dev}</b></div><div class="kpi"><span>Cumplimiento</span><b>${(m.compliance*100).toFixed(1)}%</b></div><div class="kpi"><span>Bajo</span><b>${m.low}</b></div><div class="kpi"><span>Moderado</span><b>${m.mod}</b></div><div class="kpi"><span>Alto/Crítico</span><b>${m.high}</b></div><div class="kpi"><span>IIRS</span><b>${m.iirs.toFixed(2)}</b></div>`;
+  const p=document.getElementById('labPanelProgress');if(p)p.innerHTML=`<div class="lab-progress-track"><div class="lab-progress-fill" style="width:${pct}%"></div></div><p class="small">${m.answered} de ${m.total} requisitos con respuesta · ${m.active} requisitos aplicables al cálculo consolidado.</p>`;
+  const st=document.getElementById('labPanelStatus');if(st)st.innerHTML=`<p><b>Prestador:</b> ${esc(labState.meta.prestador||'Sin completar')}</p><p><b>Auditor/a:</b> ${esc(labState.meta.auditor||currentSessionUser?.displayName||'')}</p><p><b>Entrevistado/a:</b> ${esc(interview.interviewees||'Pendiente')}</p><p><b>Estado:</b> ${pct===100?'Guía completa':'Auditoría en curso'}</p><p><b>IIRS del Área Laboratorio:</b> ${esc(labIirsBadge(m.iirs))}</p>`;
 }
+function labExecutiveText(){const m=labAreaMetrics();return `La auditoría del Área Laboratorio registra ${m.active} requisitos aplicables, con un cumplimiento del ${(m.compliance*100).toFixed(1)} %. Se identificaron ${m.dev} desvíos: ${m.low} de riesgo bajo, ${m.mod} moderados y ${m.high} altos o críticos. El IIRS preliminar del Área Laboratorio es ${m.iirs.toFixed(2)} en la escala institucional de 0 a 5. La metodología específica de riesgo de Laboratorio continúa sujeta a validación técnica.`;}
+function labActText(){const ds=labReportData();if(!ds.length)return 'LABORATORIO: no se registraron desvíos para incorporar al acta.';return `LABORATORIO: se identificaron ${ds.length} desvíos. ${ds.slice(0,5).map(d=>d.deviation||d.item).join(' ')}`;}
+function renderLabSummary(){const e=document.getElementById('labExecutiveSummary'),a=document.getElementById('labActSummary');if(e)e.textContent=labExecutiveText();if(a)a.textContent=labActText();}
+function labCopyText(id){const t=document.getElementById(id)?.textContent||'';navigator.clipboard?.writeText(t).then(()=>alert('Texto copiado.')).catch(()=>prompt('Copie el texto:',t));}
+function labPlanFor(code){return labState.plan[code]||{action:'',evidence:'',responsible:'',deadline:'',status:'PENDIENTE'};}
+function labUpdatePlan(code,key,value){labState.plan[code]={...labPlanFor(code),[key]:value};saveLabState();}
+function renderLabPlan(){const body=document.getElementById('labPlanRows');if(!body)return;const ds=labReportData();body.innerHTML=ds.length?ds.map(d=>{const p=labPlanFor(d.code),item=(window.LAB_GUIDE_ITEMS||[]).find(i=>i.code===d.code),risk=item?labItemIIRS(item):3;return `<tr><td>${esc(d.code)}</td><td>${esc(d.deviation||'Pendiente de redacción')}</td><td>${risk}</td><td><textarea rows="2" onchange="labUpdatePlan('${esc(d.code)}','action',this.value)">${esc(p.action)}</textarea></td><td><textarea rows="2" onchange="labUpdatePlan('${esc(d.code)}','evidence',this.value)">${esc(p.evidence)}</textarea></td><td><input value="${esc(p.responsible)}" onchange="labUpdatePlan('${esc(d.code)}','responsible',this.value)"></td><td><input value="${esc(p.deadline)}" onchange="labUpdatePlan('${esc(d.code)}','deadline',this.value)"></td><td><select onchange="labUpdatePlan('${esc(d.code)}','status',this.value)">${['PENDIENTE','EN PROCESO','CUMPLIDO','VERIFICADO'].map(x=>`<option ${p.status===x?'selected':''}>${x}</option>`).join('')}</select></td></tr>`}).join(''):'<tr><td colspan="8">No hay desvíos para incorporar al plan de mejora.</td></tr>';}
 function renderLabInterview(){
   ensureLabState();if(!labState.interview.auditors)labState.interview.auditors=labState.meta.auditor||currentSessionUser?.displayName||'';
   document.querySelectorAll('[data-lab-interview]').forEach(el=>{const k=el.dataset.labInterview;if(document.activeElement!==el)el.value=labState.interview[k]||'';el.oninput=()=>{labState.interview[k]=el.value;saveLabState();};});
@@ -295,7 +324,7 @@ function renderLabReportPreview(){
     <p><b>Prestador:</b> ${esc(labState.meta.prestador||'—')} &nbsp; <b>CUIT:</b> ${esc(labState.meta.cuit||'—')}</p>
     <p><b>Provincia:</b> ${esc(labState.meta.province||'—')} &nbsp; <b>UGL:</b> ${esc(labState.meta.ugl||'—')} &nbsp; <b>Fecha:</b> ${esc(labState.meta.date||'—')}</p>
     <p><b>Auditor/a:</b> ${esc(labState.meta.auditor||currentSessionUser?.displayName||'—')}</p>
-    <h3>Desvíos seleccionados (${ds.length})</h3>
+    <h3>Resumen ejecutivo</h3><p>${esc(labExecutiveText())}</p><h3>Síntesis para el acta</h3><p>${esc(labActText())}</p><h3>Desvíos seleccionados (${ds.length})</h3>
     ${ds.length?ds.map(d=>`<div class="lab-report-dev"><b>${esc(d.code)} · ${esc(d.section)}</b><p>${esc(d.item)}</p><p><b>Observación:</b> ${esc(d.observation||'—')}</p><p><b>Desvío:</b> ${esc(d.deviation||'Pendiente de redacción')}</p>${d.criticality!=='—'?`<p><b>Criticidad de referencia:</b> ${esc(d.criticality)}</p>`:''}</div>`).join(''):'<p>No se registraron respuestas NO.</p>'}
     <p class="small"><b>Nota metodológica:</b> la matriz de riesgo de Laboratorio se incorpora como versión preliminar y queda sujeta a validación técnica del área.</p>
   </div>`;

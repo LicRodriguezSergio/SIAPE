@@ -223,7 +223,7 @@
       <button class="secondary lab-tab" data-view="interview" onclick="labShowView('interview')">Entrevista y notas</button>
       <button class="secondary lab-tab" data-view="guide" onclick="labShowView('guide')">Guía II Nivel</button>
       <button class="secondary lab-tab" data-view="risk" onclick="labShowView('risk')">Matriz de riesgo</button>
-      <button class="secondary lab-tab" data-view="report" onclick="labShowView('report')">Resumen / informe</button>
+      <button class="secondary lab-tab" data-view="summary" onclick="labShowView('summary')">Resumen y acta</button><button class="secondary lab-tab" data-view="plan" onclick="labShowView('plan')">Plan de mejora</button><button class="secondary lab-tab" data-view="report" onclick="labShowView('report')">Informe</button>
       <button class="savebtn" onclick="labSaveSnapshot()">💾 Guardar Laboratorio</button>
       <button class="secondary" onclick="labReset()">Nueva auditoría</button>
     </div>
@@ -233,7 +233,11 @@
       <div class="card"><h3>Panel general · Área Laboratorio</h3><p class="small">Resumen exclusivo de la auditoría de Laboratorio.</p><div id="labPanelKpis" class="kpis"></div><div id="labPanelProgress" class="lab-panel-progress"></div></div>
       <div class="card"><h3>Situación actual</h3><div id="labPanelStatus"></div></div>
     </div>
-    <div class="card"><h3>Accesos del Área Laboratorio</h3><div class="lab-quick-grid"><button class="secondary" onclick="labShowView('interview')">Entrevista y notas</button><button class="secondary" onclick="labShowView('guide')">Abrir Guía II Nivel</button><button class="secondary" onclick="labShowView('risk')">Ver Matriz de riesgo</button><button class="secondary" onclick="labShowView('report')">Resumen / informe</button></div></div>
+    <div class="card"><h3>Accesos del Área Laboratorio</h3><div class="lab-quick-grid"><button class="secondary" onclick="labShowView('interview')">Entrevista y notas</button><button class="secondary" onclick="labShowView('guide')">Abrir Guía II Nivel</button><button class="secondary" onclick="labShowView('risk')">Ver Matriz de riesgo</button><button class="secondary" onclick="labShowView('summary')">Resumen y acta</button><button class="secondary" onclick="labShowView('plan')">Plan de mejora</button><button class="secondary" onclick="labShowView('report')">Informe</button></div></div>
+    <div class="grid2">
+      <div class="card"><h3>Resumen ejecutivo automático · Área Laboratorio</h3><div id="labPanelExecutiveSummary" class="summary-text"></div><div class="toolbar"><button class="secondary" type="button" onclick="labCopyText('labPanelExecutiveSummary')">Copiar resumen</button><button class="secondary" type="button" onclick="labShowView('summary')">Abrir Resumen y acta</button></div></div>
+      <div class="card"><h3>Síntesis de desvíos para el acta · Laboratorio</h3><div id="labPanelActSummary" class="summary-text"></div><div class="toolbar"><button class="secondary" type="button" onclick="labCopyText('labPanelActSummary')">Copiar síntesis</button><button class="secondary" type="button" onclick="labShowView('summary')">Ver detalle</button></div></div>
+    </div>
   </div>
   <div id="labInterviewView" class="lab-subview hide">
     <div class="card"><h3>Entrevista y notas · Área Laboratorio</h3><p class="small">Registro propio del Área Laboratorio. Se conserva con esta auditoría.</p>
@@ -264,6 +268,17 @@
     <div class="card">
       <div class="lab-risk-title-row"><div><h3>Matriz dinámica</h3><p class="small">Se conserva la matriz original y se añade la respuesta y el riesgo actual de esta auditoría.</p></div><button class="secondary" type="button" onclick="renderLabRiskMatrix()">Actualizar matriz</button></div>
       <div class="tablewrap"><table class="lab-risk-table"><thead><tr><th>ID</th><th>Proceso</th><th>Subproceso</th><th>Área</th><th>Ítem evaluado</th><th>Normativa</th><th>Respuesta</th><th>Incumplimiento fuente</th><th>Impacto</th><th>Peso %</th><th>Riesgo fuente</th><th>Riesgo actual</th><th>Nivel actual</th><th>Criticidad</th></tr></thead><tbody id="labRiskRows"></tbody></table></div>
+    </div>
+  </div>
+  <div id="labSummaryView" class="lab-subview hide">
+    <div class="grid2">
+      <div class="card"><h3>Resumen ejecutivo automático · Área Laboratorio</h3><div id="labExecutiveSummary" class="summary-text"></div><button class="secondary" type="button" onclick="labCopyText('labExecutiveSummary')">Copiar resumen</button></div>
+      <div class="card"><h3>Síntesis de desvíos para el acta · Laboratorio</h3><div id="labActSummary" class="summary-text"></div><button class="secondary" type="button" onclick="labCopyText('labActSummary')">Copiar síntesis</button></div>
+    </div>
+  </div>
+  <div id="labPlanView" class="lab-subview hide">
+    <div class="card"><h3>Plan de mejora · Área Laboratorio</h3><p class="small">Se genera automáticamente a partir de los desvíos seleccionados. Los campos de acción, responsable, evidencia, plazo y estado pueden completarse para cada hallazgo.</p>
+      <div class="tablewrap"><table><thead><tr><th>Código</th><th>Desvío</th><th>Riesgo</th><th>Acción correctiva</th><th>Evidencia</th><th>Responsable</th><th>Plazo</th><th>Estado</th></tr></thead><tbody id="labPlanRows"></tbody></table></div>
     </div>
   </div>
   <div id="labReportView" class="lab-subview hide">

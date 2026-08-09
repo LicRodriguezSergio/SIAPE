@@ -560,15 +560,22 @@ function normText(service){
 }
 function renderDashboard(){
  let s=stats(),general=currentIIRS();
+ const lm=(typeof window.labAreaMetrics==='function')?window.labAreaMetrics():null;
+ const sameProvider=lm&&lm.active>0&&(!state.meta.prestador||!labState?.meta?.prestador||normalizeSearch(state.meta.prestador)===normalizeSearch(labState.meta.prestador));
+ const pooledActive=s.active+(sameProvider?lm.active:0), pooledYes=Math.round(s.compliance*s.active)+(sameProvider?lm.yes:0), pooledDev=s.dev+(sameProvider?lm.dev:0);
+ const pooledCompliance=pooledActive?pooledYes/pooledActive:0;
+ const pooledIirs=pooledActive?((general.value||0)*s.active+(sameProvider?lm.iirs*lm.active:0))/pooledActive:(general.value||0);
  $("#kpis").innerHTML=[
- ["Ítems aplicables",s.active],["Respondidos",s.answered],["Desvíos",s.dev],["Riesgo alto",s.high],["Cumplimiento",(s.compliance*100).toFixed(1)+"%"],["IIRS general",formatIIRS(general)]
+ ["Ítems aplicables",pooledActive],["Respondidos",s.answered+(sameProvider?lm.answered:0)],["Desvíos",pooledDev],["Riesgo alto",s.high+(sameProvider?lm.high:0)],["Cumplimiento",(pooledCompliance*100).toFixed(1)+"%"],["IIRS general",Number(pooledIirs).toFixed(2)]
  ].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
- $("#overall").innerHTML=`${esc(riskOverall())}<div class="iirs-overall">Índice Integral de Riesgo SIAPE: ${iirsBadge(general)}</div>`;
- $("#serviceTable").innerHTML=services.filter(x=>state.enabled[x]).map(sv=>{
+ $("#overall").innerHTML=`Resultado consolidado del prestador<div class="iirs-overall">IIRS consolidado preliminar: <b>${Number(pooledIirs).toFixed(2)}</b> · Cumplimiento total: <b>${(pooledCompliance*100).toFixed(1)}%</b></div><div class="small">El consolidado pondera todos los requisitos efectivamente aplicables de las áreas cargadas; los NO APLICA no intervienen.</div>`;
+ let rows=services.filter(x=>state.enabled[x]).map(sv=>{
   let arr=activeItems().filter(i=>i.service===sv), ds=arr.filter(i=>answerFor(i.code).response==="NO");
   let ans=arr.filter(i=>["SI","NO"].includes(answerFor(i.code).response)), yes=ans.filter(i=>answerFor(i.code).response==="SI").length,idx=currentIIRS(sv);
   return `<tr><td>${sv}</td><td>${arr.length}</td><td>${ds.length}</td><td>${ans.length?(yes/ans.length*100).toFixed(1):"0.0"}%</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${iirsBadge(idx)}</td></tr>`
- }).join("");
+ });
+ if(sameProvider)rows.push(`<tr><td><b>Laboratorio</b></td><td>${lm.active}</td><td>${lm.dev}</td><td>${(lm.compliance*100).toFixed(1)}%</td><td>${lm.low}</td><td>${lm.mod}</td><td>${lm.high}</td><td><b>${lm.iirs.toFixed(2)}</b></td></tr>`);
+ $("#serviceTable").innerHTML=rows.join("");
  renderProviderRanking();
 }
 function renderSummary(){

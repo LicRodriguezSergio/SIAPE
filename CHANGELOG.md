@@ -1,3 +1,17 @@
+# SIAPE GAP V3.4.8
+
+- El Panel General del Área Laboratorio incorpora Resumen Ejecutivo automático.
+- El Panel General del Área Laboratorio incorpora Síntesis de Desvíos para el Acta.
+- Ambos textos se recalculan con las respuestas, desvíos seleccionados, cumplimiento e IIRS del Área Laboratorio.
+- Se mantienen las vistas específicas de Resumen y acta, Plan de mejora e Informe.
+
+## 3.4.7 - Laboratorio + consolidación
+- Panel Laboratorio con desvíos, cumplimiento, bajo, moderado, alto/crítico e IIRS.
+- Resumen y acta propios del Área Laboratorio.
+- Plan de mejora propio del Área Laboratorio.
+- Panel general consolida Enfermería/Laboratorio por requisitos aplicables cuando corresponden al mismo prestador.
+- Cumplimiento global ponderado por requisitos aplicables; NO APLICA excluido.
+
 # SIAPE GAP V3.4.4
 
 - Renombra la navegación principal “Auditorías” como “Área Enfermería”.
