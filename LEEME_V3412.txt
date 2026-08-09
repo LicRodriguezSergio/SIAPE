@@ -1,0 +1,1 @@
+V3.4.12: optimización de rendimiento. Los cambios quedan pendientes en memoria; Guardar realiza persistencia y recálculo completo. Autoguardado de seguridad cada 10 minutos solo si existen cambios, sin regenerar PDF ni paneles.

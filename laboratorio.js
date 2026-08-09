@@ -3,6 +3,7 @@
 const LAB_KEY='siape_laboratorio_v1';
 const LAB_LIBRARY_KEY='siape_laboratorio_guardadas_v1';
 let labState=loadLabState();
+let labDirty=false;window.labDirty=false;
 
 function labDefaultState(){
   return {
@@ -36,10 +37,17 @@ function labNotifyCrossModules(){
     }catch(e){console.warn('Actualización cruzada de Laboratorio',e)}
   },250);
 }
-function saveLabState(){
+function persistLabState(){
   ensureLabState();
   localStorage.setItem(LAB_KEY,JSON.stringify(labState));
-  labNotifyCrossModules();
+  labDirty=false;window.labDirty=false;
+  if(typeof updateSaveStatus==='function')updateSaveStatus();
+}
+window.persistLabState=persistLabState;
+function saveLabState(){
+  ensureLabState();
+  labDirty=true;window.labDirty=true;
+  if(typeof markDirty==='function')markDirty();
 }
 function labAnswer(code){
   return labState.answers[code]||{response:'',observation:'',suggestedIndex:0,customDeviation:'',deviationChoice:'suggested'};
@@ -375,6 +383,9 @@ function renderLabReportPreview(){
 }
 function labSaveSnapshot(){
   ensureLabState();
+  persistLabState();
+  renderLaboratoryModule();
+  if(typeof renderDashboard==='function')renderDashboard();
   const lib=JSON.parse(localStorage.getItem(LAB_LIBRARY_KEY)||'{}');
   const id=`LAB_${labState.meta.reportNumber||'SN'}_${labState.meta.reportYear||new Date().getFullYear()}_${Date.now()}`;
   lib[id]={savedAt:new Date().toISOString(),state:structuredClone(labState),auditor:currentSessionUser?.email||''};

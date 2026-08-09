@@ -8,7 +8,35 @@ let state=JSON.parse(localStorage.getItem(KEY)||"null")||{
  interview:{date:"",time:"",place:"",area:"",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true},
  rh:{service:"Internación general",shift:"Mañana",beds:0,occupied:0,normRef:"",method:"mixto",licensed:0,nurses:0,assistants:0,supervisors:0,absence:0,evidence:"",requiredNorm:0,pMin:0,mMin:0,pMod:0,mMod:0,pEsp:0,mEsp:0,pInt:0,mInt:0,productiveMinutes:360,upeTotal:0,upePerWorker:1,result:null}
 };
-function save(){localStorage.setItem(KEY,JSON.stringify(state));}
+let siapeDirty=false;
+let siapeLastSavedAt=null;
+function persistState(){localStorage.setItem(KEY,JSON.stringify(state));siapeDirty=false;siapeLastSavedAt=new Date();updateSaveStatus();}
+function save(){persistState();}
+function markDirty(){siapeDirty=true;updateSaveStatus();}
+function updateSaveStatus(){
+ let el=document.getElementById('siapeSaveStatus');
+ if(!el){el=document.createElement('div');el.id='siapeSaveStatus';el.className='siape-save-status';document.body.appendChild(el);}
+ if(siapeDirty){el.textContent='● Cambios pendientes';el.className='siape-save-status pending';}
+ else if(siapeLastSavedAt){el.textContent='✓ Guardado '+siapeLastSavedAt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});el.className='siape-save-status saved';}
+ else {el.textContent='';el.className='siape-save-status';}
+}
+function showAutoSaveToast(message,done=false){
+ let el=document.getElementById('siapeAutoSaveToast');
+ if(!el){el=document.createElement('div');el.id='siapeAutoSaveToast';el.className='siape-autosave-toast';document.body.appendChild(el);}
+ el.innerHTML=message;el.classList.add('show');el.classList.toggle('done',done);
+ if(done)setTimeout(()=>el.classList.remove('show'),2600);
+}
+function autoSaveSecurity(){
+ const labDirty=!!window.labDirty;
+ if(!siapeDirty&&!labDirty)return;
+ showAutoSaveToast('<b>🔄 Autoguardado de seguridad</b><br>Aguarde un instante. SIAPE está guardando la información para proteger el trabajo realizado.');
+ try{
+   if(siapeDirty)persistState();
+   if(typeof window.persistLabState==='function'&&labDirty)window.persistLabState();
+   setTimeout(()=>showAutoSaveToast('<b>✅ Información guardada correctamente</b><br>Puede continuar trabajando.',true),350);
+ }catch(e){console.error(e);showAutoSaveToast('<b>⚠️ No se pudo completar el autoguardado.</b><br>Utilice el botón Guardar.',true);}
+}
+setInterval(autoSaveSecurity,10*60*1000);
 function defaultInterview(){return {date:state?.meta?.date||new Date().toISOString().slice(0,10),time:"",place:"",area:"",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true}}
 function ensureState(){
  state.meta=state.meta||{};state.answers=state.answers||{};state.enabled=state.enabled||Object.fromEntries(["Enfermería","Esterilización","Hemodinamia","Limpieza","Lavadero"].map(x=>[x,true]));
@@ -479,8 +507,8 @@ function actSummary(){
  return affected.map(buildActaLine).filter(Boolean).join("\n\n");
 }
 function bindMeta(){
- Object.keys(state.meta).forEach(k=>{let e=document.querySelector(`[data-meta="${k}"]`);if(e){e.value=state.meta[k]||"";e.oninput=()=>{state.meta[k]=e.value;save();renderAll();}}});
- services.forEach(s=>{let e=document.querySelector(`[data-area="${s}"]`);if(e){e.checked=!!state.enabled[s];e.onchange=()=>{state.enabled[s]=e.checked;save();renderAll();}}});
+ Object.keys(state.meta).forEach(k=>{let e=document.querySelector(`[data-meta="${k}"]`);if(e){e.value=state.meta[k]||"";e.oninput=()=>{state.meta[k]=e.value;markDirty();}}});
+ services.forEach(s=>{let e=document.querySelector(`[data-area="${s}"]`);if(e){e.checked=!!state.enabled[s];e.onchange=()=>{state.enabled[s]=e.checked;markDirty();}}});
 }
 function bindInterview(){
  ensureState();
@@ -488,7 +516,7 @@ function bindInterview(){
   const k=el.dataset.interview;
   if(el.type==='checkbox')el.checked=!!state.interview[k];else el.value=state.interview[k]||'';
   if(!el.dataset.bound){
-   const update=()=>{state.interview[k]=el.type==='checkbox'?el.checked:el.value;save();const n=$('#interviewSaved');if(n){n.textContent='Guardado automático: '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}};
+   const update=()=>{state.interview[k]=el.type==='checkbox'?el.checked:el.value;markDirty();const n=$('#interviewSaved');if(n){n.textContent='Cambios pendientes · se autoguardarán cada 10 minutos';}};
    el.addEventListener('input',update);el.addEventListener('change',update);el.dataset.bound='1';
   }
  });
@@ -536,8 +564,8 @@ function renderAudit(){
  $("#auditList").innerHTML=rhBlock+normalCards||'<div class="notice">No hay requisitos aplicables con los filtros seleccionados.</div>';
  refreshVisiblePhotoCounts();
 }
-function setResp(code,r){state.answers[code]={...answerFor(code),response:r};save();renderAll()}
-function setObs(code,v){state.answers[code]={...answerFor(code),obs:v};save()}
+function setResp(code,r){state.answers[code]={...answerFor(code),response:r};markDirty();renderAudit()}
+function setObs(code,v){state.answers[code]={...answerFor(code),obs:v};markDirty()}
 function normText(service){
  const national=NORMS.filter(n=>n.service===service&&n.jurisdiction==="Nación");
  const specific=(service==="Enfermería")?NORMS.filter(n=>n.service==="Enfermería"&&n.jurisdiction===state.meta.province):[];
@@ -665,7 +693,7 @@ function renderSavedAudits(){
  el.innerHTML=arr.map(([id,x])=>{let m=x.state?.meta||{};return `<div class="saved-item"><div><strong>Informe ${esc(m.reportNumber||"S/N")}/${esc(m.reportYear||"")} · ${esc(m.prestador||"Prestador sin identificar")}</strong><div class="small">CUIT: ${esc(m.cuit||"Sin informar")} · Auditoría: ${esc(m.date||"Sin fecha")} · Jurisdicción: ${esc(m.province||"Sin informar")}</div><div class="small">Guardado: ${esc(new Date(x.savedAt).toLocaleString())} · ${Object.keys(x.state?.answers||{}).length} respuestas registradas</div></div><div class="saved-actions"><button class="secondary" onclick="loadAuditSnapshot('${id}')">Abrir / continuar</button><button class="secondary" onclick="shareSavedAudit('${id}')">Compartir</button><button class="danger" onclick="deleteAuditSnapshot('${id}')">Eliminar</button></div></div>`}).join("");
 }
 function saveAuditSnapshot(){
- save();let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");let id=base.toLowerCase();lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits();renderProviderRanking();alert(`Auditoría ${reportId()} guardada en este dispositivo.`)
+ persistState();if(typeof window.persistLabState==='function'&&window.labDirty)window.persistLabState();renderAll();let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");let id=base.toLowerCase();lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits();renderProviderRanking();alert(`Auditoría ${reportId()} guardada en este dispositivo.`)
 }
 function loadAuditSnapshot(id){let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");if(!lib[id])return;state=JSON.parse(JSON.stringify(lib[id].state));ensureState();save();renderAll();alert(`Auditoría ${reportId()} abierta.`)}
 function deleteAuditSnapshot(id){if(!confirm("¿Eliminar esta auditoría guardada del dispositivo?"))return;let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");delete lib[id];localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits()}
