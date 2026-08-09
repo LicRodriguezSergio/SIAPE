@@ -1,0 +1,7 @@
+SIAPE GAP V3.4.10 - Corrección Laboratorio
+
+Esta versión corrige dos regresiones detectadas en V3.4.9:
+1. Recupera las observaciones/desvíos estandarizados del módulo Laboratorio.
+2. Incorpora correctamente los desvíos seleccionados de Laboratorio al Informe PDF general.
+
+También optimiza el rendimiento evitando regenerar todo el informe en cada tecla escrita.

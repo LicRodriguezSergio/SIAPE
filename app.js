@@ -676,32 +676,47 @@ function rhReportBlock(){
 function renderReport(){
  let s=stats(), audited=selectedServices(), bullets=executiveBullets();
  const lm=(typeof window.labAreaMetrics==='function')?window.labAreaMetrics():null;
- const sameLab=lm&&lm.active>0&&typeof window.labGeneralReportSection==='function'&&window.labGeneralReportSection();
- const pooledActive=s.active+(sameLab?lm.active:0);
- const pooledAnswered=s.answered+(sameLab?lm.answered:0);
- const pooledDev=s.dev+(sameLab?lm.dev:0);
- const pooledMod=s.mod+(sameLab?lm.mod:0);
- const pooledHigh=s.high+(sameLab?lm.high:0);
- const pooledYes=Math.round(s.compliance*s.active)+(sameLab?lm.yes:0);
+ const attachLab=!!(lm&&lm.active>0&&typeof window.labCanAttachToGeneral==='function'&&window.labCanAttachToGeneral());
+ const labMeta=(typeof labState!=='undefined'&&labState?.meta)?labState.meta:{};
+ const meta={
+   reportNumber:state.meta.reportNumber||labMeta.reportNumber||'',
+   reportYear:state.meta.reportYear||labMeta.reportYear||String(new Date().getFullYear()),
+   prestador:state.meta.prestador||labMeta.prestador||'',
+   cuit:state.meta.cuit||labMeta.cuit||'',
+   province:state.meta.province||labMeta.province||'',
+   level:state.meta.level||labMeta.level||'',
+   type:state.meta.type||labMeta.type||'',
+   date:state.meta.date||labMeta.date||'',
+   auditor:state.meta.auditor||labMeta.auditor||currentSessionUser?.displayName||'',
+   address:state.meta.address||labMeta.address||''
+ };
+ const localReportId=()=>`${meta.reportNumber||'S/N'}/${meta.reportYear||new Date().getFullYear()}`;
+ const pooledActive=s.active+(attachLab?lm.active:0);
+ const pooledAnswered=s.answered+(attachLab?lm.answered:0);
+ const pooledDev=s.dev+(attachLab?lm.dev:0);
+ const pooledMod=s.mod+(attachLab?lm.mod:0);
+ const pooledHigh=s.high+(attachLab?lm.high:0);
+ const pooledYes=Math.round(s.compliance*s.active)+(attachLab?lm.yes:0);
  const pooledCompliance=pooledActive?pooledYes/pooledActive:0;
  const baseIirs=currentIIRS().value||0;
- const pooledIirs=pooledActive?((baseIirs*s.active)+(sameLab?lm.iirs*lm.active:0))/pooledActive:baseIirs;
- const auditedAll=[...audited];if(sameLab&&!auditedAll.includes('Laboratorio'))auditedAll.push('Laboratorio');
- const labExecutive=sameLab&&typeof labExecutiveText==='function'?labExecutiveText():'';
+ const pooledIirs=pooledActive?((baseIirs*s.active)+(attachLab?lm.iirs*lm.active:0))/pooledActive:baseIirs;
+ const auditedAll=[...audited];if(attachLab&&!auditedAll.includes('Laboratorio'))auditedAll.push('Laboratorio');
+ const labExecutive=attachLab&&typeof labExecutiveText==='function'?labExecutiveText():'';
  const combinedExecutive=[executive(),labExecutive].filter(Boolean).join(' ');
- const labSection=sameLab?window.labGeneralReportSection():'';
- const labTech=sameLab&&typeof labReportData==='function'&&labReportData().length?`<h3 class="area-heading">LABORATORIO</h3>${labReportData().map(d=>`<div class="deviation-block"><h4>${esc(d.code)} · ${esc(d.deviation||d.item)}</h4>${d.observation?`<p><b>Observación y evidencia:</b> ${esc(d.observation)}</p>`:''}<p><b>Requisito:</b> ${esc(d.item)}</p><p><b>Área/proceso:</b> ${esc(d.section)}</p></div>`).join('')}`:'';
+ const labSection=attachLab&&typeof window.labGeneralReportSection==='function'?window.labGeneralReportSection():'';
+ const labDs=attachLab&&typeof labReportData==='function'?labReportData():[];
+ const labTech=labDs.length?`<h3 class="area-heading">LABORATORIO</h3>${labDs.map(d=>`<div class="deviation-block"><h4>${esc(d.code)} · ${esc(d.deviation||d.item)}</h4>${d.observation?`<p><b>Observación y evidencia:</b> ${esc(d.observation)}</p>`:''}<p><b>Requisito:</b> ${esc(d.item)}</p><p><b>Área/proceso:</b> ${esc(d.section)}</p></div>`).join('')}`:'';
  $("#reportContent").innerHTML=`<div class="report">
- <section class="cover"><h1>INFORME EJECUTIVO N° ${esc(reportId())}</h1><h2>AUDITORÍA INTEGRAL PRESTACIONAL</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(state.meta.prestador||"PRESTADOR")}</div></section>
+ <section class="cover"><h1>INFORME EJECUTIVO N° ${esc(localReportId())}</h1><h2>AUDITORÍA INTEGRAL PRESTACIONAL</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||"PRESTADOR")}</div></section>
  <section><h1>ÍNDICE</h1><div class="index-list">1. Datos del prestador y de la auditoría<br>2. Resumen ejecutivo<br>3. Objeto de la auditoría<br>4. Alcance<br>5. Panel general y análisis de riesgo<br>6. Área Laboratorio (si corresponde)<br>7. Conclusiones<br>8. Anexo técnico legal<br>9. Anexo técnico operativo - Desvíos por área y proceso</div></section>
- <section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(reportId())}</td><th>Fecha</th><td>${esc(state.meta.date)}</td></tr><tr><th>Institución</th><td>${esc(state.meta.prestador)}</td><th>CUIT</th><td>${esc(state.meta.cuit)}</td></tr><tr><th>Domicilio</th><td>${esc(state.meta.address)}</td><th>Jurisdicción</th><td>${esc(state.meta.province)}</td></tr><tr><th>Nivel</th><td>${esc(state.meta.level)}</td><th>Tipo</th><td>${esc(state.meta.type)}</td></tr><tr><th>Auditor</th><td colspan="3">${esc(state.meta.auditor)}</td></tr><tr><th>Áreas auditadas</th><td colspan="3">${esc(auditedAll.join(", "))}</td></tr></table></section>
+ <section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(localReportId())}</td><th>Fecha</th><td>${esc(meta.date)}</td></tr><tr><th>Institución</th><td>${esc(meta.prestador)}</td><th>CUIT</th><td>${esc(meta.cuit)}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address)}</td><th>Jurisdicción</th><td>${esc(meta.province)}</td></tr><tr><th>Nivel</th><td>${esc(meta.level)}</td><th>Tipo</th><td>${esc(meta.type)}</td></tr><tr><th>Auditor</th><td colspan="3">${esc(meta.auditor)}</td></tr><tr><th>Áreas auditadas</th><td colspan="3">${esc(auditedAll.join(", "))}</td></tr></table></section>
  <section class="report-section"><h1>2. RESUMEN EJECUTIVO</h1><p>${esc(combinedExecutive)}</p>${bullets.length?`<p>En tal sentido se verificó:</p><ul class="red-list">${bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}<p>La evaluación consolidada comprende ${pooledActive} requisitos aplicables. Se registraron ${pooledDev} desvíos, de los cuales ${pooledHigh} son altos o críticos y ${pooledMod} moderados. El detalle se encuentra en los anexos técnicos por área.</p></section>
  <section class="report-section"><h1>3. OBJETO DE LA AUDITORÍA</h1><p>El objeto de la presente auditoría es verificar el cumplimiento del proceso prestacional en las áreas seleccionadas, conforme al vínculo prestacional con el INSSJP, evaluando aspectos legales, organizativos, técnicos y de calidad de la traza de atención y de los procesos de apoyo auditados.</p></section>
  <section class="report-section"><h1>4. ALCANCE</h1><p>Análisis del proceso prestacional mediante el relevamiento de las siguientes áreas: <b>${esc(auditedAll.join(", "))}</b>.</p><p>Para llevar adelante la tarea precitada:</p><ul>${scopeText()}</ul><p>El alcance se limita a las áreas seleccionadas y a la evidencia efectivamente disponible y observada durante el relevamiento.</p></section>
- ${interviewReportBlock()}<section class="report-section"><h1>5. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS consolidado (0–5)</th></tr><tr><td>${pooledActive}</td><td>${pooledAnswered}</td><td>${pooledDev}</td><td>${pooledMod}</td><td>${pooledHigh}</td><td>${(pooledCompliance*100).toFixed(1)}%</td><td>${Number(pooledIirs).toFixed(2)}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}${sameLab&&typeof labActText==='function'?` ${esc(labActText())}`:''}</div></section>
+ ${interviewReportBlock()}<section class="report-section"><h1>5. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS consolidado (0–5)</th></tr><tr><td>${pooledActive}</td><td>${pooledAnswered}</td><td>${pooledDev}</td><td>${pooledMod}</td><td>${pooledHigh}</td><td>${(pooledCompliance*100).toFixed(1)}%</td><td>${Number(pooledIirs).toFixed(2)}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}${attachLab&&typeof labActText==='function'?` ${esc(labActText())}`:''}</div></section>
  ${labSection}
- <section class="report-section"><h1>7. CONCLUSIONES</h1><p>${esc(conclusionsText())}${sameLab?` ${esc(labExecutiveText())}`:''}</p></section>
- <section class="report-section"><h1>8. ANEXO TÉCNICO LEGAL</h1>${legalAnnex()}${sameLab?'<h3>Laboratorio</h3><p>Se incorpora la normativa específica consignada en la guía y matriz técnica de Laboratorio, sujeta a validación según jurisdicción, nivel y requisito.</p>':''}<p class="small">Las referencias normativas deben validarse según jurisdicción, nivel, tipo de establecimiento y requisito concreto antes de citar artículos específicos.</p></section>
+ <section class="report-section"><h1>7. CONCLUSIONES</h1><p>${esc(conclusionsText())}${attachLab&&typeof labExecutiveText==='function'?` ${esc(labExecutiveText())}`:''}</p></section>
+ <section class="report-section"><h1>8. ANEXO TÉCNICO LEGAL</h1>${legalAnnex()}${attachLab?'<h3>Laboratorio</h3><p>Se incorpora la normativa específica consignada en la guía y matriz técnica de Laboratorio, sujeta a validación según jurisdicción, nivel y requisito.</p>':''}<p class="small">Las referencias normativas deben validarse según jurisdicción, nivel, tipo de establecimiento y requisito concreto antes de citar artículos específicos.</p></section>
  <section class="report-section"><h1>9. ANEXO TÉCNICO OPERATIVO - DESVÍOS POR ÁREA Y PROCESO</h1>${technicalAnnex()}${labTech}</section>
  <div class="signature">Firma del auditor</div></div>`;
 }

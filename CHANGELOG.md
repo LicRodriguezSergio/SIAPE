@@ -1,3 +1,12 @@
+# SIAPE GAP V3.4.10
+
+- Se restauran íntegramente las observaciones y desvíos estandarizados de Laboratorio.
+- Se corrige la inclusión de los desvíos de Laboratorio en el Informe PDF general.
+- El informe usa los datos del Área Laboratorio cuando el panel general todavía no tiene metadatos cargados.
+- Se mantiene la derivación de desvíos de Laboratorio a Seguimiento.
+- Se elimina el recálculo completo del panel/informe en cada pulsación para mejorar el rendimiento.
+- La actualización cruzada se realiza solo cuando el panel, informe o seguimiento están visibles.
+
 # SIAPE GAP V3.4.9
 
 - Área Laboratorio integrada al Informe PDF general y consolidado del prestador.
