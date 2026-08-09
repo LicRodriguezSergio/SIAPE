@@ -1,5 +1,5 @@
 
-// ===== SIAPE V3.4.3 · MÓDULO LABORATORIO (PRUEBA) =====
+// ===== SIAPE V3.4.4 · MÓDULO LABORATORIO + MATRIZ DINÁMICA =====
 const LAB_KEY='siape_laboratorio_v1';
 const LAB_LIBRARY_KEY='siape_laboratorio_guardadas_v1';
 let labState=loadLabState();
@@ -8,6 +8,7 @@ function labDefaultState(){
   return {
     meta:{reportNumber:'',reportYear:String(new Date().getFullYear()),prestador:'',cuit:'',province:'',ugl:'',address:'',level:'II',date:new Date().toISOString().slice(0,10),auditor:''},
     answers:{},
+    riskManual:{},
     view:'guide'
   };
 }
@@ -17,6 +18,7 @@ function loadLabState(){
 function ensureLabState(){
   labState.meta={...labDefaultState().meta,...(labState.meta||{})};
   labState.answers=labState.answers||{};
+  labState.riskManual=labState.riskManual||{};
 }
 function saveLabState(){ensureLabState();localStorage.setItem(LAB_KEY,JSON.stringify(labState))}
 function labAnswer(code){
@@ -80,6 +82,7 @@ function labShowView(view,saveView=true){
 function updateLabMeta(el){
   labState.meta[el.dataset.labMeta]=el.value;
   saveLabState();renderLabStats();
+  if(labState.view==='risk')renderLabRiskMatrix();
 }
 function labResponseLabel(v){return ({SI:'Cumple',NO:'Desvío',NA:'No aplica',NE:'No evaluado'})[v]||'Pendiente'}
 function labCriterionDefaultDeviation(item){return `No se acredita el cumplimiento del criterio: ${item.item}.`}
@@ -158,10 +161,84 @@ function labHandleInput(e){
   if(['suggestedIndex','deviationChoice'].includes(f))renderLabGuide();
   renderLabStats();
 }
+function labNormText(v){
+  return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+const LAB_RISK_ALIASES={
+  1:['identificacion','dos datos'],2:['concordancia','paciente','muestra'],3:['instructivos','preparacion'],4:['ayuno'],5:['tubos','recoleccion'],
+  6:['registro','ingreso','muestras'],7:['tiempos','recepcion'],8:['control','temperatura','heladeras'],9:['registro','temperatura'],10:['elementos','barrera'],
+  11:['residuos','patogenicos'],12:['liquidos','residuales'],13:['toma','muestras'],14:['lavado','manos'],15:['equipamiento','necesario','suficiente'],
+  16:['gases','sangre'],17:['microscopio'],18:['hemograma'],19:['plaquetas'],20:['coagulacion','tp','kptt'],21:['quimica','basica'],22:['calcemia'],
+  23:['ast','alt','fal'],24:['amilasa'],25:['enzimas','cardiacas'],26:['orina','completa'],27:['liquidos','puncion'],28:['control','calidad','interno'],
+  29:['control','calidad','interno'],30:['control','calidad','interno'],31:['control','calidad','interno'],32:['control','calidad','externo'],33:['tratamiento','estadistico'],
+  34:['acciones','correctivas'],35:['bacteriologia','exclusivo'],36:['bacteriologia','flujo','aire'],37:['bacteriologia','autoclave'],38:['bacteriologia','estufa'],
+  39:['maldi','bactec'],40:['informe','validado'],41:['informe','laboratorio','completo'],42:['valores','referencia'],43:['firma','profesional'],44:['derivaciones'],
+  45:['respaldo','resultados'],46:['valores','criticos'],47:['resguardo','informes'],48:['direccion','tecnica'],49:['matricula','vigente'],50:['bioquimico','presente'],
+  51:['personal','tecnico','matricula'],52:['guardias','activas'],53:['grupo','electrogeno'],54:['heladeras','exclusivas'],55:['sector','lavado','separado'],
+  56:['superficies','lavables'],57:['matafuego'],58:['indicadores','calidad'],59:['capacitacion','personal']
+};
+function labRiskMatchScore(r,item){
+  const a=labNormText(item.item), words=LAB_RISK_ALIASES[r.id]||labNormText(r.item).split(' ').filter(w=>w.length>3);
+  let score=0; words.forEach(w=>{if(a.includes(labNormText(w)))score+=1});
+  const rn=labNormText(r.item);if(a.includes(rn)||rn.includes(a))score+=4;
+  return score;
+}
+function labRiskLinkedGuideItem(r){
+  const items=window.LAB_GUIDE_ITEMS||[];let best=null,bestScore=0;
+  items.forEach(i=>{const sc=labRiskMatchScore(r,i);if(sc>bestScore){best=i;bestScore=sc}});
+  return bestScore>=Math.min(2,(LAB_RISK_ALIASES[r.id]||[]).length||2)?best:null;
+}
+function labRiskStatus(r){
+  const linked=labRiskLinkedGuideItem(r);
+  if(linked){const response=labAnswer(linked.code).response||'';if(response)return {response,linked};}
+  const manual=labState.riskManual?.[r.id]||'';
+  return {response:manual,linked};
+}
+function labRiskCurrent(r){
+  const {response}=labRiskStatus(r);
+  if(response==='SI')return 0;
+  if(response==='NO')return Number(r.riesgo)||0;
+  return null;
+}
+function labRiskCurrentLevel(r){
+  const v=labRiskCurrent(r);if(v===null)return 'Pendiente';if(v===0)return 'Sin riesgo';return r.nivel||'—';
+}
+function labRiskResponseText(v){return ({SI:'Cumple',NO:'No cumple',NA:'No aplica',NE:'No evaluado'})[v]||'Pendiente'}
+function labRiskClass(r){
+  const v=labRiskCurrent(r);if(v===null||v===0)return 'risk-zero';
+  const lvl=labNormText(r.nivel);if(lvl.includes('crit'))return 'risk-critical';if(lvl.includes('alto'))return 'risk-high';if(lvl.includes('moder'))return 'risk-moderate';return 'risk-low';
+}
+function labRiskProcessData(){
+  const rows=window.LAB_RISK_MATRIX||[], names=['PREANALÍTICO','ANALÍTICO','POSTANALÍTICO','APOYO'];
+  return names.map(name=>{
+    const pr=rows.filter(r=>r.proceso===name), vals=pr.map(labRiskCurrent).filter(v=>v!==null), positives=vals.filter(v=>v>0);
+    return {name,total:positives.reduce((a,b)=>a+b,0),avg:vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0,max:vals.length?Math.max(...vals):0,evaluated:vals.length,findings:positives.length};
+  });
+}
+function renderLabRiskDashboard(){
+  const rows=window.LAB_RISK_MATRIX||[], evaluated=rows.filter(r=>labRiskCurrent(r)!==null), findings=rows.filter(r=>(labRiskCurrent(r)||0)>0);
+  const total=findings.reduce((a,r)=>a+(labRiskCurrent(r)||0),0), max=findings.length?Math.max(...findings.map(r=>labRiskCurrent(r)||0)):0;
+  const critical=findings.filter(r=>labNormText(r.nivel).includes('crit')).length;
+  const process=labRiskProcessData(), highest=[...process].sort((a,b)=>b.total-a.total)[0];
+  const k=document.getElementById('labRiskKpis');if(k)k.innerHTML=`<div class="kpi"><span>Requisitos evaluados</span><b>${evaluated.length}/${rows.length}</b></div><div class="kpi"><span>Hallazgos con riesgo</span><b>${findings.length}</b></div><div class="kpi"><span>Riesgo acumulado*</span><b>${total.toFixed(2)}</b></div><div class="kpi"><span>Riesgo máximo</span><b>${max.toFixed(2)}</b></div><div class="kpi"><span>Críticos*</span><b>${critical}</b></div>`;
+  const chart=document.getElementById('labRiskProcessChart');
+  if(chart){const mx=Math.max(1,...process.map(x=>x.total));chart.innerHTML=process.map(x=>`<div class="lab-process-row"><div class="lab-process-label"><b>${esc(x.name)}</b><span>${x.findings} hallazgo(s) · ${x.evaluated} evaluado(s)</span></div><div class="lab-process-track"><div class="lab-process-bar" style="width:${Math.max(0,x.total/mx*100).toFixed(1)}%"></div></div><div class="lab-process-value">${x.total.toFixed(2)}</div></div>`).join('')+(evaluated.length?`<div class="small lab-chart-note">Mayor riesgo acumulado actual: <b>${esc(highest.name)}</b>.</div>`:'<div class="notice">Todavía no hay respuestas suficientes para construir el gráfico.</div>');}
+  const heat=document.getElementById('labRiskHeatmap');
+  if(heat){const top=[...findings].sort((a,b)=>(labRiskCurrent(b)||0)-(labRiskCurrent(a)||0)).slice(0,12);heat.innerHTML=top.length?top.map(r=>`<div class="lab-heat-row ${labRiskClass(r)}"><span class="lab-heat-id">${esc(r.id)}</span><span class="lab-heat-item">${esc(r.item)}</span><b>${(labRiskCurrent(r)||0).toFixed(2)}</b></div>`).join(''):'<div class="notice">Los hallazgos aparecerán aquí cuando se registren respuestas NO.</div>';}
+}
+function labSetRiskManual(id,value){
+  ensureLabState();labState.riskManual[id]=value;saveLabState();renderLabRiskMatrix();
+}
 function renderLabRiskMatrix(){
   const body=document.getElementById('labRiskRows');if(!body)return;
   const rows=window.LAB_RISK_MATRIX||[];
-  body.innerHTML=rows.map(r=>`<tr><td>${esc(r.id)}</td><td>${esc(r.proceso)}</td><td>${esc(r.subproceso)}</td><td>${esc(r.area)}</td><td>${esc(r.item)}</td><td>${esc(r.normativa)}</td><td>${esc(r.incumplimiento)}</td><td>${esc(r.impacto)}</td><td>${esc(r.peso)}</td><td>${esc(r.riesgo)}</td><td>${esc(r.nivel)}</td><td>${esc(r.criticidad)}</td><td>${esc(r.prioridad)}</td></tr>`).join('');
+  body.innerHTML=rows.map(r=>{
+    const st=labRiskStatus(r), current=labRiskCurrent(r), linked=st.linked;
+    const response=st.response||'';
+    const responseUi=linked?`<div class="lab-risk-response"><b>${esc(labRiskResponseText(response))}</b><span>Guía: ${esc(linked.code)}</span></div>`:`<select class="lab-risk-manual" onchange="labSetRiskManual(${Number(r.id)},this.value)"><option value="" ${!response?'selected':''}>Pendiente</option><option value="SI" ${response==='SI'?'selected':''}>Cumple</option><option value="NO" ${response==='NO'?'selected':''}>No cumple</option><option value="NA" ${response==='NA'?'selected':''}>No aplica</option><option value="NE" ${response==='NE'?'selected':''}>No evaluado</option></select>`;
+    return `<tr class="${labRiskClass(r)}"><td>${esc(r.id)}</td><td>${esc(r.proceso)}</td><td>${esc(r.subproceso)}</td><td>${esc(r.area)}</td><td>${esc(r.item)}</td><td>${esc(r.normativa)}</td><td>${responseUi}</td><td>${esc(r.incumplimiento)}</td><td>${esc(r.impacto)}</td><td>${esc(r.peso)}</td><td>${Number(r.riesgo).toFixed(2)}</td><td><b>${current===null?'—':current.toFixed(2)}</b></td><td>${esc(labRiskCurrentLevel(r))}</td><td>${esc(current&&current>0?r.criticidad:'—')}</td></tr>`;
+  }).join('');
+  renderLabRiskDashboard();
 }
 function labReportData(){
   const items=window.LAB_GUIDE_ITEMS||[];
@@ -173,7 +250,7 @@ function labReportData(){
 function renderLabReportPreview(){
   const root=document.getElementById('labReportPreview');if(!root)return;
   const ds=labReportData();
-  root.innerHTML=`<div class="lab-report-sheet"><h2>LABORATORIO · INFORME DE AUDITORÍA</h2>
+  root.innerHTML=`<div class="lab-report-sheet"><h2>Laboratorio · Informe de Auditoría</h2>
     <p><b>Prestador:</b> ${esc(labState.meta.prestador||'—')} &nbsp; <b>CUIT:</b> ${esc(labState.meta.cuit||'—')}</p>
     <p><b>Provincia:</b> ${esc(labState.meta.province||'—')} &nbsp; <b>UGL:</b> ${esc(labState.meta.ugl||'—')} &nbsp; <b>Fecha:</b> ${esc(labState.meta.date||'—')}</p>
     <p><b>Auditor/a:</b> ${esc(labState.meta.auditor||currentSessionUser?.displayName||'—')}</p>

@@ -154,3 +154,37 @@ body:not(.locked) main,body:not(.locked) header{animation:siapeEnter .5s ease bo
 .lab-report-dev{padding:12px;margin:12px 0;border:1px solid #d8e0e5;border-radius:8px}
 .lab-tab.active{outline:3px solid rgba(18,61,90,.15)}
 @media(max-width:700px){.lab-hero{display:block}.lab-item-head{display:block}.lab-response{display:inline-block;margin-top:8px}}
+
+/* ===== V3.4.4 · Área Enfermería + Laboratorio / matriz dinámica ===== */
+.area-enfermeria-banner{border-left:4px solid var(--primary,#123d5a)}
+.area-enfermeria-banner h2{margin-bottom:6px}
+.area-enfermeria-banner p{margin:0}
+.lab-risk-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.lab-risk-title-row h2,.lab-risk-title-row h3{margin-bottom:4px}
+.lab-risk-title-row p{margin-top:0}
+.lab-risk-dashboard{align-items:stretch}
+.lab-risk-dashboard>.card{height:100%}
+.lab-process-chart{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.lab-process-row{display:grid;grid-template-columns:minmax(145px,1.2fr) minmax(160px,2.2fr) 64px;gap:12px;align-items:center}
+.lab-process-label{display:flex;flex-direction:column;gap:2px}
+.lab-process-label span{font-size:12px;color:var(--muted,#667085)}
+.lab-process-track{height:12px;border-radius:999px;background:rgba(18,61,90,.10);overflow:hidden}
+.lab-process-bar{height:100%;border-radius:999px;background:linear-gradient(90deg,#2f7ea7,#b34747);transition:width .25s ease}
+.lab-process-value{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.lab-chart-note{margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.08)}
+.lab-heatmap{display:flex;flex-direction:column;gap:7px;margin-top:14px}
+.lab-heat-row{display:grid;grid-template-columns:34px 1fr 58px;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;border-left:5px solid #9aa4ad;background:rgba(0,0,0,.025)}
+.lab-heat-row b{text-align:right;font-variant-numeric:tabular-nums}
+.lab-heat-id{font-size:12px;color:var(--muted,#667085)}
+.lab-heat-item{line-height:1.25}
+.lab-heat-row.risk-low{border-left-color:#4f8f63;background:rgba(79,143,99,.08)}
+.lab-heat-row.risk-moderate{border-left-color:#c79a22;background:rgba(199,154,34,.10)}
+.lab-heat-row.risk-high{border-left-color:#d2762c;background:rgba(210,118,44,.10)}
+.lab-heat-row.risk-critical{border-left-color:#b73b3b;background:rgba(183,59,59,.10)}
+.lab-risk-table tr.risk-moderate td{background:rgba(199,154,34,.055)}
+.lab-risk-table tr.risk-high td{background:rgba(210,118,44,.055)}
+.lab-risk-table tr.risk-critical td{background:rgba(183,59,59,.065)}
+.lab-risk-response{display:flex;flex-direction:column;min-width:96px;gap:2px}
+.lab-risk-response span{font-size:11px;color:var(--muted,#667085)}
+.lab-risk-manual{min-width:120px;padding:6px 8px}
+@media(max-width:720px){.lab-process-row{grid-template-columns:1fr 52px}.lab-process-label{grid-column:1/-1}.lab-risk-title-row{display:block}.lab-risk-title-row .badge{display:inline-block;margin-top:6px}}

@@ -1,0 +1,11 @@
+SIAPE GAP V3.4.4 · LABORATORIO Y MATRIZ DINÁMICA
+
+Cambios principales:
+- El menú “Auditorías” pasa a llamarse “Área Enfermería”.
+- Se explicitan los sectores incluidos: Guardia, Piso/Internación, UTI, UCO, Esterilización, Hemodinamia, Lavadero y Limpieza.
+- “LABORATORIO” pasa a “Laboratorio”.
+- Se incorpora dentro de Laboratorio un dashboard de matriz de riesgo dinámico basado en la Supermatriz recibida.
+- El gráfico de riesgo por proceso se recalcula con las respuestas de la auditoría.
+- Se incorpora heatmap de hallazgos y matriz con riesgo fuente vs. riesgo actual.
+- La metodología permanece identificada como preliminar y sujeta a validación del equipo de Laboratorio.
+- No se modifican login, mapa, seguimiento ni las guías originales.

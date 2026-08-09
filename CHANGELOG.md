@@ -1,3 +1,12 @@
+# SIAPE GAP V3.4.4
+
+- Renombra la navegación principal “Auditorías” como “Área Enfermería”.
+- Identifica los servicios incluidos del Área Enfermería.
+- Normaliza “LABORATORIO” a “Laboratorio”.
+- Incorpora dashboard dinámico de riesgo por procesos y heatmap en Laboratorio.
+- Conserva la Supermatriz original como referencia y calcula riesgo actual según respuestas.
+- Mantiene la metodología de riesgo en estado preliminar.
+
 # SIAPE GAP — Versión oficial 3.4.0
 
 ## Incluye

@@ -1,2 +1,3 @@
-SIAPE GAP
-Versión demostrativa: 3.4.3 - Módulo Laboratorio con especialidad y desvío personalizado
+SIAPE GAP V3.4.4
+Área Enfermería + Laboratorio con matriz de riesgo dinámica
+09/08/2026
