@@ -91,6 +91,11 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Se renueva la caché para evitar que el navegador conserve la interfaz anterior.
 
 
-## V3.4.12G
+## V3.4.12H
 - Se elimina de forma defensiva cualquier botón Plan de mejora del Área Laboratorio.
 - Se fuerza actualización de caché y Service Worker para evitar que GitHub Pages muestre una interfaz anterior.
+
+
+## V3.4.12H
+- Se incorpora firma manuscrita táctil del profesional entrevistado en Área Laboratorio.
+- La firma se guarda con nombre, cargo, matrícula, fecha/hora y se incorpora al informe de Laboratorio.

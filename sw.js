@@ -1,5 +1,5 @@
-const CACHE='siape-v3412g-laboratorio-sin-plan-mejora';
-const ASSETS=['./styles.css?v=3412g','./app.js?v=3412g','./data.js?v=3412g','./laboratorio-data.js?v=3412g','./laboratorio.js?v=3412g','./manifest.json','./firebase-config.js?v=3412g','./pami-logo.png'];
+const CACHE='siape-v3412h-laboratorio-sin-plan-mejora';
+const ASSETS=['./styles.css?v=3412h','./app.js?v=3412h','./data.js?v=3412h','./laboratorio-data.js?v=3412h','./laboratorio.js?v=3412h','./manifest.json','./firebase-config.js?v=3412h','./pami-logo.png'];
 self.addEventListener('install',event=>{
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).catch(()=>{}));

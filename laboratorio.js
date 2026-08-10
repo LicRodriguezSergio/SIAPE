@@ -17,7 +17,7 @@ function labDefaultState(){
     meta:{reportNumber:'',reportYear:String(new Date().getFullYear()),prestador:'',cuit:'',province:'',ugl:'',address:'',level:'II',date:new Date().toISOString().slice(0,10),auditor:''},
     answers:{},
     riskManual:{},
-    interview:{date:new Date().toISOString().slice(0,10),time:'',place:'',area:'',interviewees:'',roles:'',license:'',auditors:'',summary:'',documents:'',notes:''},
+    interview:{date:new Date().toISOString().slice(0,10),time:'',place:'',area:'',interviewees:'',roles:'',license:'',auditors:'',summary:'',documents:'',notes:'',signature:{name:'',role:'',license:'',dateTime:'',image:'',confirmed:false}},
     plan:{},
     guideForm:{prestador:'',fecha:new Date().toISOString().slice(0,10),entrevistada:'',cargo:'',dtNombre:'',dtEspecialidad:'',dtMatricula:'',rhBioquimicos:'',rhTecnicos:'',rhAdministrativos:'',rhLimpieza:'',bioqHorarios:{},clasificacionPropio:false,clasificacionTercerizado:false,clasificacionMixto:false,clasificacionInterno:false,clasificacionExterno:false,clasificacionMixto2:false,ubicacion:'',informePapel:false,informeElectronico:false,pacientesDia:'',funcHorarios:{},guardiaActiva:false,guardiaPasiva:false,conBioquimico:false,sinBioquimico:false,equipManual:false,equipAutomatico:false,equipMixto:false,equipos:{},otrosEquipos:''},
     guideSection:'',
@@ -32,6 +32,7 @@ function ensureLabState(){
   labState.answers=labState.answers||{};
   labState.riskManual=labState.riskManual||{};
   labState.interview={...labDefaultState().interview,...(labState.interview||{})};
+  labState.interview.signature={...labDefaultState().interview.signature,...((labState.interview||{}).signature||{})};
   labState.plan=labState.plan||{};
   labState.guideForm={...labDefaultState().guideForm,...(labState.guideForm||{})};
   labState.guideForm.bioqHorarios=labState.guideForm.bioqHorarios||{};labState.guideForm.funcHorarios=labState.guideForm.funcHorarios||{};labState.guideForm.equipos=labState.guideForm.equipos||{};
@@ -383,9 +384,132 @@ function labExecutiveText(){const m=labAreaMetrics();return `La auditoría del �
 function labActText(){const ds=labReportData();if(!ds.length)return 'LABORATORIO: no se registraron desvíos para incorporar al acta.';return `LABORATORIO: se identificaron ${ds.length} desvíos. ${ds.slice(0,5).map(d=>d.deviation||d.item).join(' ')}`;}
 function renderLabSummary(){const e=document.getElementById('labExecutiveSummary'),a=document.getElementById('labActSummary');if(e)e.textContent=labExecutiveText();if(a)a.textContent=labActText();}
 function labCopyText(id){const t=document.getElementById(id)?.textContent||'';navigator.clipboard?.writeText(t).then(()=>alert('Texto copiado.')).catch(()=>prompt('Copie el texto:',t));}
+
+let labSignatureDrawing=false;
+let labSignatureDirty=false;
+
+function labSignatureCanvas(){
+  return document.getElementById('labSignaturePad');
+}
+
+function labSignaturePoint(ev,canvas){
+  const rect=canvas.getBoundingClientRect();
+  const t=ev.touches&&ev.touches[0]?ev.touches[0]:ev;
+  return {
+    x:(t.clientX-rect.left)*(canvas.width/rect.width),
+    y:(t.clientY-rect.top)*(canvas.height/rect.height)
+  };
+}
+
+function labInitSignaturePad(){
+  ensureLabState();
+  const canvas=labSignatureCanvas();
+  if(!canvas || canvas.dataset.bound==='1') {
+    labRenderSignatureState();
+    return;
+  }
+  canvas.dataset.bound='1';
+  const ctx=canvas.getContext('2d');
+  ctx.lineWidth=4;
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+  ctx.strokeStyle='#111';
+
+  const start=(ev)=>{
+    ev.preventDefault();
+    labSignatureDrawing=true;
+    labSignatureDirty=true;
+    const p=labSignaturePoint(ev,canvas);
+    ctx.beginPath();
+    ctx.moveTo(p.x,p.y);
+  };
+  const move=(ev)=>{
+    if(!labSignatureDrawing)return;
+    ev.preventDefault();
+    const p=labSignaturePoint(ev,canvas);
+    ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+  };
+  const end=(ev)=>{
+    if(!labSignatureDrawing)return;
+    if(ev)ev.preventDefault();
+    labSignatureDrawing=false;
+  };
+
+  canvas.addEventListener('pointerdown',start);
+  canvas.addEventListener('pointermove',move);
+  window.addEventListener('pointerup',end);
+  canvas.addEventListener('touchstart',start,{passive:false});
+  canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',end,{passive:false});
+
+  labRenderSignatureState();
+}
+
+function labRenderSignatureState(){
+  ensureLabState();
+  const sig=labState.interview.signature||{};
+  document.querySelectorAll('[data-lab-signature]').forEach(el=>{
+    const k=el.dataset.labSignature;
+    if(document.activeElement!==el)el.value=sig[k]||'';
+  });
+  const dt=document.getElementById('labSignatureDateTime');
+  if(dt)dt.value=sig.dateTime?new Date(sig.dateTime).toLocaleString('es-AR'):'';
+  const status=document.getElementById('labSignatureStatus');
+  if(status){
+    status.textContent=sig.confirmed?'Firma registrada ✓':'Sin firma';
+    status.classList.toggle('ok',!!sig.confirmed);
+  }
+  const canvas=labSignatureCanvas();
+  if(canvas){
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(sig.image){
+      const img=new Image();
+      img.onload=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height)};
+      img.src=sig.image;
+    }
+  }
+  labSignatureDirty=false;
+}
+
+function labClearSignature(){
+  ensureLabState();
+  const canvas=labSignatureCanvas();
+  if(canvas)canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  labState.interview.signature={name:'',role:'',license:'',dateTime:'',image:'',confirmed:false};
+  document.querySelectorAll('[data-lab-signature]').forEach(el=>el.value='');
+  const dt=document.getElementById('labSignatureDateTime');if(dt)dt.value='';
+  const status=document.getElementById('labSignatureStatus');
+  if(status){status.textContent='Sin firma';status.classList.remove('ok')}
+  labSignatureDirty=false;
+  saveLabState();
+}
+
+function labConfirmSignature(){
+  ensureLabState();
+  const canvas=labSignatureCanvas();
+  if(!canvas){alert('No se encontró el área de firma.');return}
+  const sig={...(labState.interview.signature||{})};
+  document.querySelectorAll('[data-lab-signature]').forEach(el=>sig[el.dataset.labSignature]=el.value.trim());
+  if(!sig.name){alert('Complete el nombre y apellido del profesional antes de confirmar la firma.');return}
+  const blank=document.createElement('canvas');
+  blank.width=canvas.width;blank.height=canvas.height;
+  const hasDrawing=canvas.toDataURL()!==blank.toDataURL();
+  if(!hasDrawing && !sig.image){alert('El profesional debe firmar dentro del recuadro antes de confirmar.');return}
+  sig.image=canvas.toDataURL('image/png');
+  sig.dateTime=new Date().toISOString();
+  sig.confirmed=true;
+  labState.interview.signature=sig;
+  saveLabState();
+  labRenderSignatureState();
+  alert('Firma registrada correctamente.');
+}
+
 function renderLabInterview(){
   ensureLabState();if(!labState.interview.auditors)labState.interview.auditors=labState.meta.auditor||currentSessionUser?.displayName||'';
   document.querySelectorAll('[data-lab-interview]').forEach(el=>{const k=el.dataset.labInterview;if(document.activeElement!==el)el.value=labState.interview[k]||'';el.oninput=()=>{labState.interview[k]=el.value;saveLabState();};});
+  setTimeout(labInitSignaturePad,0);
 }
 function labSaveInterview(){document.querySelectorAll('[data-lab-interview]').forEach(el=>labState.interview[el.dataset.labInterview]=el.value);saveLabState();renderLabPanel();alert('Entrevista de Laboratorio guardada.')}
 function labClearInterview(){if(!confirm('¿Limpiar el registro de entrevista de Laboratorio?'))return;labState.interview={...labDefaultState().interview,auditors:labState.meta.auditor||currentSessionUser?.displayName||''};saveLabState();renderLabInterview();}
@@ -467,6 +591,8 @@ function renderLabReportPreview(){
     ${ds.length?ds.map(d=>`<div class="lab-report-dev"><b>${esc(d.displayCode||d.code)} · ${esc(d.section)}</b><p>${esc(d.item)}</p><p><b>Observación:</b> ${esc(d.observation||'—')}</p><p><b>Desvío:</b> ${esc(d.deviation||'Pendiente de redacción')}</p>${d.criticality!=='—'?`<p><b>Criticidad de referencia:</b> ${esc(d.criticality)}</p>`:''}</div>`).join(''):'<p>No se registraron respuestas NO.</p>'}
     <p class="small"><b>Nota metodológica:</b> la matriz de riesgo de Laboratorio se incorpora como versión preliminar y queda sujeta a validación técnica del área.</p>
   </div>`;
+
+  const _sigTarget=document.getElementById('labReportPreview');if(_sigTarget)_sigTarget.insertAdjacentHTML('beforeend',labSignatureReportHTML());
 }
 function labSaveSnapshot(){
   ensureLabState();
@@ -517,3 +643,27 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#labGuideItems')&&e.target.dataset.labAction==='response')labHandleInput(e);
 });
 document.addEventListener('DOMContentLoaded',()=>{ensureLabState()});
+
+document.addEventListener('input',function(ev){
+  const el=ev.target.closest?.('[data-lab-signature]');
+  if(!el)return;
+  ensureLabState();
+  labState.interview.signature=labState.interview.signature||{};
+  labState.interview.signature[el.dataset.labSignature]=el.value;
+  labState.interview.signature.confirmed=false;
+  const status=document.getElementById('labSignatureStatus');
+  if(status){status.textContent='Firma pendiente de confirmar';status.classList.remove('ok')}
+});
+
+function labSignatureReportHTML(){
+  ensureLabState();
+  const s=(labState.interview||{}).signature||{};
+  if(!s.confirmed||!s.image)return '';
+  const fecha=s.dateTime?new Date(s.dateTime).toLocaleString('es-AR'):'';
+  return `<div class="lab-report-signature" style="margin-top:24px;border-top:1px solid #bbb;padding-top:14px">
+    <h3>Firma del profesional entrevistado/a</h3>
+    <img src="${s.image}" alt="Firma del profesional entrevistado" style="max-width:360px;width:100%;height:auto;border-bottom:1px solid #444">
+    <div><b>${esc(s.name||'')}</b>${s.role?` · ${esc(s.role)}`:''}${s.license?` · Matrícula ${esc(s.license)}`:''}</div>
+    ${fecha?`<div class="small">Firma registrada: ${esc(fecha)}</div>`:''}
+  </div>`;
+}
