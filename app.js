@@ -238,6 +238,18 @@ function stats(){
 }
 function riskOverall(){let s=stats();return s.high>0?"ROJO - NIVEL ALTO":s.mod>0?"AMARILLO - NIVEL MODERADO":s.dev>0?"VERDE - NIVEL BAJO":"SIN DESVÍOS REGISTRADOS"}
 
+// Estado de cumplimiento institucional (independiente del IIRS de riesgo).
+// <40 Malo · 40–<60 Moderado · 60–<70 Bueno · 70–75 Muy bueno · >75 Excelente.
+function complianceBand(percent){
+ const p=Math.max(0,Math.min(100,Number(percent)||0));
+ if(p<40)return {label:'MALO',cls:'compliance-bad'};
+ if(p<60)return {label:'MODERADO',cls:'compliance-moderate'};
+ if(p<70)return {label:'BUENO',cls:'compliance-good'};
+ if(p<=75)return {label:'MUY BUENO',cls:'compliance-very-good'};
+ return {label:'EXCELENTE',cls:'compliance-excellent'};
+}
+function complianceBadge(percent){const b=complianceBand(percent);return `<span class="compliance-badge ${b.cls}">${Number(percent).toFixed(1)}% · ${b.label}</span>`}
+
 // Índice Integral de Riesgo SIAPE (IIRS).
 // Cada requisito respondido SI vale 0; cada NO conserva el riesgo propio del ítem (0 a 5).
 // NA y requisitos sin responder no intervienen en el cálculo.
@@ -596,13 +608,14 @@ function renderDashboard(){
  $("#kpis").innerHTML=[
  ["Ítems aplicables",pooledActive],["Respondidos",s.answered+(sameProvider?lm.answered:0)],["Desvíos",pooledDev],["Riesgo alto",s.high+(sameProvider?lm.high:0)],["Cumplimiento",(pooledCompliance*100).toFixed(1)+"%"],["IIRS general",Number(pooledIirs).toFixed(2)]
  ].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
- $("#overall").innerHTML=`Resultado consolidado del prestador<div class="iirs-overall">IIRS consolidado preliminar: <b>${Number(pooledIirs).toFixed(2)}</b> · Cumplimiento total: <b>${(pooledCompliance*100).toFixed(1)}%</b></div><div class="small">El consolidado pondera todos los requisitos efectivamente aplicables de las áreas cargadas; los NO APLICA no intervienen.</div>`;
+ const pooledPct=pooledCompliance*100;$("#overall").innerHTML=`Resultado consolidado del prestador<div class="iirs-overall">IIRS consolidado preliminar: <b>${Number(pooledIirs).toFixed(2)}</b> · Cumplimiento total: <b>${pooledPct.toFixed(1)}%</b> · ${complianceBadge(pooledPct)}</div><div class="small">El estado de cumplimiento se interpreta por porcentaje; el IIRS se mantiene como indicador independiente de riesgo. Los NO APLICA no intervienen.</div>`;
  let rows=services.filter(x=>state.enabled[x]).map(sv=>{
   let arr=activeItems().filter(i=>i.service===sv), ds=arr.filter(i=>answerFor(i.code).response==="NO");
   let ans=arr.filter(i=>["SI","NO"].includes(answerFor(i.code).response)), yes=ans.filter(i=>answerFor(i.code).response==="SI").length,idx=currentIIRS(sv);
-  return `<tr><td>${sv}</td><td>${arr.length}</td><td>${ds.length}</td><td>${ans.length?(yes/ans.length*100).toFixed(1):"0.0"}%</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${iirsBadge(idx)}</td></tr>`
+  const pct=ans.length?(yes/ans.length*100):0;
+  return `<tr><td>${sv}</td><td>${arr.length}</td><td>${ds.length}</td><td>${pct.toFixed(1)}%</td><td>${complianceBadge(pct)}</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${iirsBadge(idx)}</td></tr>`
  });
- if(sameProvider)rows.push(`<tr><td><b>Laboratorio</b></td><td>${lm.active}</td><td>${lm.dev}</td><td>${(lm.compliance*100).toFixed(1)}%</td><td>${lm.low}</td><td>${lm.mod}</td><td>${lm.high}</td><td><b>${lm.iirs.toFixed(2)}</b></td></tr>`);
+ if(sameProvider){const lpct=lm.compliance*100;rows.push(`<tr><td><b>Laboratorio</b></td><td>${lm.active}</td><td>${lm.dev}</td><td>${lpct.toFixed(1)}%</td><td>${complianceBadge(lpct)}</td><td>${lm.low}</td><td>${lm.mod}</td><td>${lm.high}</td><td><b>${lm.iirs.toFixed(2)}</b></td></tr>`);}
  $("#serviceTable").innerHTML=rows.join("");
  renderProviderRanking();
 }
@@ -611,7 +624,18 @@ function renderSummary(){
 }
 function renderDevs(){
  let ds=deviations().sort((a,b)=>b.score-a.score);
- $("#devRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${i.domain}</td><td>${t.deviation}</td><td>${a.obs||""}</td><td>${t.why}</td><td>${riskLabel(i.score)}</td><td>${t.rec}</td><td>${t.resp}</td><td>${t.plazo}</td><td>${normText(i.service)}</td></tr>`}).join("");
+ let generalRows=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${i.domain}</td><td>${t.deviation}</td><td>${a.obs||""}</td><td>${t.why}</td><td>${riskLabel(i.score)}</td><td>${t.rec}</td><td>${t.resp}</td><td>${t.plazo}</td><td>${normText(i.service)}</td></tr>`});
+ let labRows=[];
+ if(typeof window.labReportData==='function' && (typeof window.labCanAttachToGeneral!=='function'||window.labCanAttachToGeneral())){
+   const items=window.LAB_GUIDE_ITEMS||[];
+   labRows=window.labReportData().map(d=>{
+     const item=items.find(x=>x.code===d.code);
+     const risk=item&&typeof window.labItemIIRS==='function'?window.labItemIIRS(item):3;
+     const p=typeof window.labPlanFor==='function'?window.labPlanFor(d.code):{};
+     return `<tr class="lab-consolidated-row"><td>${esc(d.code)}</td><td>Laboratorio</td><td>${esc(d.section||'Laboratorio')}</td><td>${esc(d.deviation||d.item||'')}</td><td>${esc(d.observation||'')}</td><td>Desvío identificado en la Guía de Laboratorio y consolidado automáticamente en SIAPE.</td><td>${esc(riskLabel(risk))}</td><td>${esc(p.action||'Subsanar el desvío detectado y acreditar su regularización conforme al requisito auditado.')}</td><td>${esc(p.responsible||'Responsable del Área Laboratorio / Dirección Técnica')}</td><td>${esc(p.deadline||'A definir según criticidad')}</td><td>${esc(item?.normative||item?.normativa||'Normativa consignada en la Guía de Laboratorio')}</td></tr>`;
+   });
+ }
+ const devBody=$("#devRows");if(devBody)devBody.innerHTML=[...generalRows,...labRows].join("");
  $("#planRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${t.deviation}</td><td>${t.rec}</td><td>${t.ev}</td><td>${t.resp}</td><td>${t.plazo}</td><td><select onchange="setStatus('${i.code}',this.value)">${["PENDIENTE","EN PROCESO","CUMPLIDO","VERIFICADO"].map(x=>`<option ${a.status===x?"selected":""}>${x}</option>`).join("")}</select></td></tr>`}).join("");
 }
 function setStatus(c,v){state.answers[c]={...answerFor(c),status:v};save()}
@@ -693,9 +717,23 @@ function renderSavedAudits(){
  el.innerHTML=arr.map(([id,x])=>{let m=x.state?.meta||{};return `<div class="saved-item"><div><strong>Informe ${esc(m.reportNumber||"S/N")}/${esc(m.reportYear||"")} · ${esc(m.prestador||"Prestador sin identificar")}</strong><div class="small">CUIT: ${esc(m.cuit||"Sin informar")} · Auditoría: ${esc(m.date||"Sin fecha")} · Jurisdicción: ${esc(m.province||"Sin informar")}</div><div class="small">Guardado: ${esc(new Date(x.savedAt).toLocaleString())} · ${Object.keys(x.state?.answers||{}).length} respuestas registradas</div></div><div class="saved-actions"><button class="secondary" onclick="loadAuditSnapshot('${id}')">Abrir / continuar</button><button class="secondary" onclick="shareSavedAudit('${id}')">Compartir</button><button class="danger" onclick="deleteAuditSnapshot('${id}')">Eliminar</button></div></div>`}).join("");
 }
 function saveAuditSnapshot(){
- persistState();if(typeof window.persistLabState==='function'&&window.labDirty)window.persistLabState();renderAll();let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");let id=base.toLowerCase();lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits();renderProviderRanking();alert(`Auditoría ${reportId()} guardada en este dispositivo.`)
+ persistState();
+ if(typeof window.persistLabState==='function'&&window.labDirty)window.persistLabState();
+ let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");
+ let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");
+ let id=base.toLowerCase();
+ lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};
+ localStorage.setItem(LIBKEY,JSON.stringify(lib));
+ // Actualiza solo vistas derivadas livianas; las pantallas pesadas se renderizan al abrirlas.
+ renderSavedAudits();renderProviderRanking();
+ const active=document.querySelector('.page.active')?.id||'';
+ if(active==='dashPage')renderDashboard();
+ if(active==='devPage')renderDevs();
+ if(active==='executivePage'&&isManagementRole(currentSessionUser?.role))renderExecutiveDashboard();
+ if(active==='providerMapPage')renderProviderMapMarkers();
+ alert(`Auditoría ${reportId()} guardada en este dispositivo.`);
 }
-function loadAuditSnapshot(id){let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");if(!lib[id])return;state=JSON.parse(JSON.stringify(lib[id].state));ensureState();save();renderAll();alert(`Auditoría ${reportId()} abierta.`)}
+function loadAuditSnapshot(id){let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");if(!lib[id])return;state=JSON.parse(JSON.stringify(lib[id].state));ensureState();persistState();bindMeta();bindInterview();renderSavedAudits();const active=document.querySelector('.page.active')?.id||'startPage';renderActivePage(active);alert(`Auditoría ${reportId()} abierta.`)}
 function deleteAuditSnapshot(id){if(!confirm("¿Eliminar esta auditoría guardada del dispositivo?"))return;let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");delete lib[id];localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits()}
 function rhReportBlock(){
  const r=state.rh?.result;if(!r?.calculated)return "";
@@ -749,24 +787,20 @@ function renderReport(){
  <div class="signature">Firma del auditor</div></div>`;
 }
 function renderAll(){ensureState();bindMeta();bindInterview();bindRH();renderRH();renderDashboard();renderAudit();renderSummary();renderDevs();renderNorms();renderReport();renderSavedAudits();if(isManagementRole(currentSessionUser?.role))renderExecutiveDashboard()}
-function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="reportPage")renderReport();if(id==="rrhhPage"){bindRH();renderRH()}if(id==="interviewPage")bindInterview();if(id==="summaryPage"||id==="aiPage")renderSummary();if(id==="aiPage")updateAIConnection();if(id==="executivePage")renderExecutiveDashboard();if(id==="providerMapPage")renderProviderMap();if(id==="followupPage")renderFollowupModule();window.scrollTo({top:0,left:0,behavior:"auto"})}
-function openRHCalculator(){try{const btn=Array.from(document.querySelectorAll(".navbtn")).find(b=>/RRHH Enfermer/i.test(b.textContent||""));showPage("rrhhPage",btn||null);setTimeout(()=>{const first=document.querySelector("#rrhhPage [data-rh]");if(first)first.focus({preventScroll:true});window.scrollTo(0,0)},0)}catch(e){console.error(e);alert("No se pudo abrir la calculadora de Recursos Humanos. Detalle: "+e.message)}}
-function copyText(id){navigator.clipboard.writeText($("#"+id).textContent);alert("Texto copiado")}
-function exportJSON(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="SIAPE_Informe_"+(state.meta.reportNumber||"SN")+"_"+(state.meta.reportYear||"SA")+"_"+(state.meta.prestador||"prestador")+".json";a.click()}
-function importJSON(e){let f=e.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);ensureState();save();renderAll();alert("Auditoría importada")}catch{alert("Archivo no válido")}};r.readAsText(f)}
-function resetAudit(){if(confirm("¿Crear una nueva auditoría? La auditoría actual seguirá disponible solo si fue guardada con el botón 💾 o exportada.")){state={meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},answers:{},enabled:Object.fromEntries(services.map(x=>[x,true])),interview:defaultInterview(),rh:defaultRH()};save();renderAll()}}
-
-function defaultRH(){return {service:"Internación general",shift:"Mañana",beds:0,occupied:0,normRef:"",method:"mixto",licensed:0,nurses:0,assistants:0,supervisors:0,absence:0,evidence:"",requiredNorm:0,pMin:0,mMin:0,pMod:0,mMod:0,pEsp:0,mEsp:0,pInt:0,mInt:0,productiveMinutes:360,upeTotal:0,upePerWorker:1,result:null}}
-function ensureRH(){state.rh={...defaultRH(),...(state.rh||{})}}
-function n(v){const x=Number(v);return Number.isFinite(x)?Math.max(0,x):0}
-function bindRH(){
- ensureRH();
- $$('[data-rh]').forEach(el=>{
-  const k=el.dataset.rh;
-  if(document.activeElement!==el)el.value=state.rh[k]??"";
-  if(!el.dataset.bound){el.addEventListener('input',()=>{state.rh[k]=el.type==='number'?n(el.value):el.value;state.rh.result=null;save();renderRH()});el.addEventListener('change',()=>{state.rh[k]=el.type==='number'?n(el.value):el.value;state.rh.result=null;save();renderRH()});el.dataset.bound='1'}
- });
+function renderActivePage(id){
+ if(id==='auditPage')renderAudit();
+ else if(id==='dashPage')renderDashboard();
+ else if(id==='devPage')renderDevs();
+ else if(id==='reportPage')renderReport();
+ else if(id==='normPage')renderNorms();
+ else if(id==='summaryPage'||id==='aiPage')renderSummary();
+ else if(id==='rrhhPage'){bindRH();renderRH();}
+ else if(id==='interviewPage')bindInterview();
+ else if(id==='executivePage')renderExecutiveDashboard();
+ else if(id==='providerMapPage')renderProviderMap();
+ else if(id==='followupPage')renderFollowupModule();
 }
+function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");renderActivePage(id);if(id==="aiPage")updateAIConnection();window.scrollTo({top:0,left:0,behavior:"auto"})}
 function rhRisk(coverage){
  if(coverage>=95)return {label:"ADECUADA",score:1,css:"rh-ok"};
  if(coverage>=80)return {label:"MODERADO",score:3,css:"rh-mod"};
@@ -807,7 +841,7 @@ function renderRH(){
 }
 function clearRH(){if(!confirm('¿Limpiar los datos del módulo de Recursos Humanos?'))return;state.rh=defaultRH();save();bindRH();renderAll()}
 
-window.addEventListener("load",()=>{renderAll();});
+window.addEventListener("load",()=>{ensureState();bindMeta();bindInterview();renderSavedAudits();renderProviderRanking();updateSaveStatus();});
 
 // ===== MODO IA HÍBRIDO (opcional) =====
 const AI_SETTINGS_KEY="siape_ai_settings_v2";
@@ -1004,17 +1038,46 @@ let malvinasLabelMarker=null;
 function providerRiskKey(p){if(p.iirs===null||p.iirs===undefined)return'gris';if(p.iirs<=2)return'verde';if(p.iirs<4)return'amarillo';return'rojo'}
 function providerRiskLabel(p){const k=providerRiskKey(p);return k==='verde'?'Verde · Buen cumplimiento':k==='amarillo'?'Amarillo · Riesgo moderado':k==='rojo'?'Rojo · Riesgo alto':'Gris · Sin auditoría'}
 function providerMarkerStyle(p){const k=providerRiskKey(p);const colors={verde:'#15803d',amarillo:'#ca8a04',rojo:'#b91c1c',gris:'#64748b'};return{radius:9,fillColor:colors[k],color:'#ffffff',weight:2,opacity:1,fillOpacity:.92}}
+const PROVINCE_CENTERS={
+ 'CABA':[-34.6037,-58.3816],'Buenos Aires':[-36.5,-60.0],'Catamarca':[-28.47,-65.78],'Chaco':[-27.45,-58.99],'Chubut':[-43.3,-65.1],'Córdoba':[-31.42,-64.19],'Corrientes':[-27.47,-58.83],'Entre Ríos':[-31.74,-60.51],'Formosa':[-26.18,-58.18],'Jujuy':[-24.19,-65.30],'La Pampa':[-36.62,-64.29],'La Rioja':[-29.41,-66.86],'Mendoza':[-32.89,-68.85],'Misiones':[-27.36,-55.90],'Neuquén':[-38.95,-68.06],'Río Negro':[-40.81,-63.00],'Salta':[-24.79,-65.41],'San Juan':[-31.54,-68.54],'San Luis':[-33.30,-66.34],'Santa Cruz':[-50.0,-69.2],'Santa Fe':[-31.63,-60.70],'Santiago del Estero':[-27.78,-64.27],'Tierra del Fuego':[-54.80,-68.30],'Tucumán':[-26.81,-65.22]
+};
+function stableOffset(text){let h=0;for(const c of String(text||''))h=((h<<5)-h)+c.charCodeAt(0),h|=0;return [((h%17)-8)*.055,((((h>>4)%17)-8)*.055)];}
+function snapshotCompliance(snapshot){
+ const st=snapshot?.state||snapshot;if(!st)return null;const level=st.meta?.level||'III',enabled=st.enabled||{};
+ const items=ITEMS.filter(i=>(enabled[i.service]!==false)&&String(i.levels||'').includes(level));
+ const ev=items.filter(i=>['SI','NO'].includes(st.answers?.[i.code]?.response));if(!ev.length)return null;
+ return ev.filter(i=>st.answers?.[i.code]?.response==='SI').length/ev.length*100;
+}
+function savedProviderMapData(){
+ const lib=JSON.parse(localStorage.getItem(LIBKEY)||'{}'),latest={};
+ Object.entries(lib).forEach(([id,snap])=>{const m=snap?.state?.meta||{},name=String(m.prestador||'').trim();if(!name)return;const key=name.toLocaleLowerCase('es');if(!latest[key]||String(snap.savedAt||'')>String(latest[key].savedAt||''))latest[key]={id,snap,savedAt:snap.savedAt||''};});
+ const labLib=JSON.parse(localStorage.getItem('siape_laboratorio_guardadas_v1')||'{}'),latestLab={};
+ Object.entries(labLib).forEach(([id,snap])=>{const m=snap?.state?.meta||{},name=String(m.prestador||'').trim();if(!name)return;const key=name.toLocaleLowerCase('es');if(!latestLab[key]||String(snap.savedAt||'')>String(latestLab[key].savedAt||''))latestLab[key]={id,snap,savedAt:snap.savedAt||''};});
+ const keys=new Set([...Object.keys(latest),...Object.keys(latestLab)]),out=[];
+ keys.forEach(key=>{
+   const g=latest[key]?.snap,l=latestLab[key]?.snap,gm=g?.state?.meta||{},lm=l?.state?.meta||{};const m=Object.keys(gm).length?gm:lm;
+   const name=m.prestador||lm.prestador||'Prestador';const province=m.province||lm.province||'';const center=PROVINCE_CENTERS[province]||[-38.4,-63.6];const off=stableOffset(name);
+   const gi=g?snapshotIIRS(g):null,gc=g?snapshotCompliance(g):null;let li=null,lc=null;
+   let ln=0;if(l&&l.state){const a=l.state.answers||{},items=window.LAB_GUIDE_ITEMS||[];const ev=items.filter(i=>['SI','NO'].includes(a[i.code]?.response));if(ev.length){ln=ev.length;lc=ev.filter(i=>a[i.code]?.response==='SI').length/ev.length*100;const crMap={baja:2,media:3,alta:4,'crítica':5,critica:5};const scores=ev.map(i=>{if(a[i.code]?.response!=='NO')return 0;const idx=Number(a[i.code]?.suggestedIndex)||0;const cr=String(i.suggestions?.[idx]?.criticality||'').toLowerCase();return crMap[cr]||3;});li=scores.reduce((x,y)=>x+y,0)/scores.length;}}
+   const parts=[];if(gi?.value!=null)parts.push({n:gi.evaluated,i:gi.value,c:gc});if(li!=null)parts.push({n:ln||1,i:li,c:lc});
+   const weight=parts.reduce((s,x)=>s+x.n,0)||1,iirs=parts.length?parts.reduce((s,x)=>s+x.i*x.n,0)/weight:null,compliance=parts.length?parts.reduce((s,x)=>s+(x.c??0)*x.n,0)/weight:null;
+   const areas=[];if(g){services.forEach(sv=>{if(g.state?.enabled?.[sv]!==false&&ITEMS.some(i=>i.service===sv&&String(i.levels||'').includes(g.state?.meta?.level||'III')))areas.push(sv)});}if(l)areas.push('Laboratorio');
+   out.push({id:'saved-'+key,name,province,city:m.address||lm.address||'Ubicación registrada por provincia',lat:Number(m.lat||lm.lat)||center[0]+off[0],lng:Number(m.lng||lm.lng)||center[1]+off[1],type:m.type||'Prestador auditado',complexity:`Nivel ${m.level||lm.level||'—'}`,module:'Auditoría SIAPE',capitas:Number(m.capitas||lm.capitas)||0,compliance,iirs,lastAudit:m.date||lm.date||latest[key]?.savedAt?.slice(0,10)||latestLab[key]?.savedAt?.slice(0,10)||'—',areas:[...new Set(areas)],locationQuality:(m.lat&&m.lng)||(lm.lat&&lm.lng)?'exacta':'provincial aproximada',source:'saved'});
+ });
+ return out;
+}
+function providerMapDataset(){const saved=savedProviderMapData();return saved.length?saved:DEMO_PROVIDERS;}
 function filteredDemoProviders(){
  const search=(document.getElementById('providerMapSearch')?.value||'').trim().toLowerCase();
  const province=document.getElementById('providerMapProvince')?.value||'';
  const complexity=document.getElementById('providerMapComplexity')?.value||'';
  const risk=document.getElementById('providerMapRisk')?.value||'';
- return DEMO_PROVIDERS.filter(p=>(!search||`${p.name} ${p.province} ${p.city}`.toLowerCase().includes(search))&&(!province||p.province===province)&&(!complexity||p.complexity===complexity)&&(!risk||providerRiskKey(p)===risk));
+ return providerMapDataset().filter(p=>(!search||`${p.name} ${p.province} ${p.city}`.toLowerCase().includes(search))&&(!province||p.province===province)&&(!complexity||p.complexity===complexity)&&(!risk||providerRiskKey(p)===risk));
 }
 function renderProviderMap(){
  if(typeof L==='undefined'){document.getElementById('providerMapDetail').innerHTML='<h2>Mapa no disponible</h2><p>No se pudo cargar el componente cartográfico. Verifique la conexión a Internet.</p>';return}
  const select=document.getElementById('providerMapProvince');
- if(select&&select.options.length===1)[...new Set(DEMO_PROVIDERS.map(p=>p.province))].sort().forEach(v=>select.add(new Option(v,v)));
+ if(select){const current=select.value;select.innerHTML='<option value="">Todas las provincias</option>';[...new Set(providerMapDataset().map(p=>p.province).filter(Boolean))].sort().forEach(v=>select.add(new Option(v,v)));if([...select.options].some(o=>o.value===current))select.value=current;}
  if(!providerMapInstance){
   providerMapInstance=L.map('providerMap',{zoomControl:true,minZoom:3}).setView([-38.4,-63.6],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap'}).addTo(providerMapInstance);
@@ -1047,7 +1110,7 @@ function renderProviderMapMarkers(){
  const audited=items.filter(p=>p.iirs!==null);const totalCapitas=items.reduce((s,p)=>s+(p.capitas||0),0);const avg=audited.length?audited.reduce((s,p)=>s+p.iirs,0)/audited.length:null;
  const k=document.getElementById('providerMapKpis');if(k)k.innerHTML=[
   `<div class="kpi"><b>${items.length}</b><span>Prestadores visibles</span></div>`,
-  `<div class="kpi"><b>${totalCapitas.toLocaleString('es-AR')}</b><span>Cápitas demostrativas</span></div>`,
+  `<div class="kpi"><b>${totalCapitas.toLocaleString('es-AR')}</b><span>Cápitas registradas</span></div>`,
   `<div class="kpi"><b>${avg===null?'—':avg.toFixed(2)}</b><span>IIRS promedio</span></div>`,
   `<div class="kpi"><b>${items.filter(p=>providerRiskKey(p)==='rojo').length}</b><span>Prestadores en rojo</span></div>`
  ].join('');
@@ -1063,7 +1126,7 @@ function showProviderMapDetail(p){
    <div><dt>Tipo</dt><dd>${esc(p.type)}</dd></div><div><dt>Complejidad</dt><dd>${esc(p.complexity)}</dd></div>
    <div><dt>Modalidad</dt><dd>${esc(p.module)}</dd></div><div><dt>Cápitas</dt><dd>${p.capitas.toLocaleString('es-AR')}</dd></div>
    <div><dt>Cumplimiento</dt><dd>${compliance}</dd></div><div><dt>IIRS</dt><dd>${iirs}</dd></div>
-   <div><dt>Última auditoría</dt><dd>${esc(p.lastAudit)}</dd></div>
+   <div><dt>Última auditoría</dt><dd>${esc(p.lastAudit)}</dd></div><div><dt>Ubicación</dt><dd>${esc(p.locationQuality||'georreferenciada')}</dd></div>
   </dl>
   <h3>Áreas auditadas</h3><p>${p.areas.length?p.areas.map(esc).join(' · '):'Todavía no registra áreas auditadas.'}</p>
   <button class="primary" type="button" onclick="alert('En la versión definitiva este botón abrirá la ficha completa del prestador, su historial, auditorías y planes de mejora.')">Ver ficha completa</button>`;

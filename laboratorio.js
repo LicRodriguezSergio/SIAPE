@@ -162,11 +162,12 @@ function labAreaMetrics(){
   return {active:applicable.length,answered:items.filter(i=>['SI','NO','NA','NE'].includes((ans[i.code]||{}).response)).length,dev:dev.length,low:dev.filter(i=>labItemIIRS(i)<=2).length,mod:dev.filter(i=>labItemIIRS(i)===3).length,high:dev.filter(i=>labItemIIRS(i)>=4).length,compliance,iirs,yes:yes.length,total:items.length};
 }
 window.labAreaMetrics=labAreaMetrics;
+window.labItemIIRS=labItemIIRS;
 function labIirsBadge(v){const n=Number(v)||0;const band=n<=2?'Verde':n<4?'Moderado':'Alto';return `${n.toFixed(2)} · ${band}`;}
 function renderLabStats(){
   const m=labAreaMetrics();
   const el=document.getElementById('labKpis');
-  if(el)el.innerHTML=`<div class="kpi"><span>Requisitos</span><b>${m.total}</b></div><div class="kpi"><span>Evaluados</span><b>${m.answered}</b></div><div class="kpi"><span>Desvíos</span><b>${m.dev}</b></div><div class="kpi"><span>Cumplimiento</span><b>${(m.compliance*100).toFixed(1)}%</b></div><div class="kpi"><span>IIRS</span><b>${m.iirs.toFixed(2)}</b></div>`;
+  if(el){const pct=m.compliance*100;const band=typeof complianceBand==='function'?complianceBand(pct):{label:''};el.innerHTML=`<div class="kpi"><span>Requisitos</span><b>${m.total}</b></div><div class="kpi"><span>Evaluados</span><b>${m.answered}</b></div><div class="kpi"><span>Desvíos</span><b>${m.dev}</b></div><div class="kpi"><span>Cumplimiento</span><b>${pct.toFixed(1)}%</b><small>${esc(band.label||'')}</small></div><div class="kpi"><span>IIRS</span><b>${m.iirs.toFixed(2)}</b></div>`;}
 }
 function renderLabGuide(){
   const root=document.getElementById('labGuideItems');if(!root)return;
@@ -216,8 +217,8 @@ function labHandleInput(e){
   else if(f==='deviationChoice')a.deviationChoice=e.target.value;
   else a[f]=e.target.value;
   labState.answers[code]=a;saveLabState();
-  if(['suggestedIndex','deviationChoice'].includes(f))renderLabGuide();
-  renderLabStats();
+  if(['suggestedIndex','deviationChoice'].includes(f)){renderLabGuide();renderLabStats();}
+  else if(e.type==='change')renderLabStats();
 }
 function labNormText(v){
   return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
@@ -316,7 +317,8 @@ function renderLabSunburst(){
   const totalWeight=normalized.reduce((a,r)=>a+Math.max(r._risk,0.15),0)||1;let angle=0;const cx=250,cy=250;let paths=[];
   for(const proc of procNames){const pr=normalized.filter(r=>r._proc===proc),pw=pr.reduce((a,r)=>a+Math.max(r._risk,0.15),0),pa0=angle,pa1=angle+360*pw/totalWeight;paths.push(`<path d="${labArcPath(cx,cy,55,120,pa0,pa1)}" fill="${colors[proc]||'#9fb3c8'}" fill-opacity=".75" stroke="white" stroke-width="2"><title>${esc(proc)}</title></path>`);
     let sa=pa0;const subs=[...new Set(pr.map(r=>r.subproceso))];for(const sub of subs){const sr=pr.filter(r=>r.subproceso===sub),sw=sr.reduce((a,r)=>a+Math.max(r._risk,0.15),0),s1=sa+360*sw/totalWeight;paths.push(`<path d="${labArcPath(cx,cy,122,185,sa,s1)}" fill="${colors[proc]||'#9fb3c8'}" fill-opacity=".55" stroke="white" stroke-width="1.5" class="lab-sun-segment" onclick="labSunDetail('${String(proc).replace(/'/g,"\'")}','${String(sub).replace(/'/g,"\'")}','',${sr.reduce((a,r)=>a+r._risk,0).toFixed(2)})"><title>${esc(proc)} · ${esc(sub)}</title></path>`);let ia=sa;for(const r of sr){const iw=Math.max(r._risk,0.15),i1=ia+360*iw/totalWeight;const opacity=r._risk>0?.88:.22;paths.push(`<path d="${labArcPath(cx,cy,187,238,ia,i1)}" fill="${colors[proc]||'#9fb3c8'}" fill-opacity="${opacity}" stroke="white" stroke-width="1" class="lab-sun-segment" onclick="labSunDetail('${String(proc).replace(/'/g,"\'")}','${String(sub).replace(/'/g,"\'")}','${String(r.item).replace(/'/g,"\'")}',${r._risk.toFixed(2)})"><title>${esc(r.item)} · Riesgo actual ${r._risk.toFixed(2)}</title></path>`);ia=i1;}sa=s1;}angle=pa1;}
-  host.innerHTML=`<svg viewBox="0 0 500 500" role="img" aria-label="Mapa circular dinámico de riesgo de Laboratorio">${paths.join('')}<circle cx="250" cy="250" r="52" fill="white"/><text x="250" y="244" text-anchor="middle" font-size="15" font-weight="700" fill="#17394c">LABORATORIO</text><text x="250" y="266" text-anchor="middle" font-size="12" fill="#667085">Riesgo dinámico</text></svg><div class="lab-sun-legend">${procNames.map(p=>`<span><i style="background:${colors[p]||'#9fb3c8'}"></i>${esc(p)}</span>`).join('')}</div>`;
+  const met=labAreaMetrics();const pct=met.compliance*100;const cb=(typeof complianceBand==='function'?complianceBand(pct):{label:''});
+  host.innerHTML=`<div class="lab-risk-orbit"><svg viewBox="0 0 500 500" role="img" aria-label="Mapa circular dinámico de riesgo de Laboratorio"><defs><filter id="labGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter><radialGradient id="labCore"><stop offset="0%" stop-color="#133a50"/><stop offset="100%" stop-color="#061923"/></radialGradient></defs><circle cx="250" cy="250" r="242" class="lab-orbit-line"/><circle cx="250" cy="250" r="190" class="lab-orbit-line lab-orbit-dash"/>${paths.join('')}<circle cx="250" cy="250" r="62" fill="url(#labCore)" stroke="#5fd4ff" stroke-width="2" filter="url(#labGlow)"/><text x="250" y="231" text-anchor="middle" font-size="12" font-weight="700" fill="#a7e9ff">ÁREA LABORATORIO</text><text x="250" y="253" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">IIRS ${met.iirs.toFixed(2)}</text><text x="250" y="273" text-anchor="middle" font-size="11" fill="#b9dbe7">${pct.toFixed(1)}% · ${esc(cb.label||'')}</text></svg></div><div class="lab-sun-legend futuristic">${procNames.map(p=>`<span><i style="background:${colors[p]||'#9fb3c8'}"></i>${esc(p)}</span>`).join('')}</div>`;
 }
 function labSunDetail(proc,sub,item,risk){const el=document.getElementById('labSunburstDetail');if(el)el.innerHTML=`<b>${esc(proc)}</b>${sub?' · '+esc(sub):''}${item?' · '+esc(item):''} — Riesgo actual: <b>${Number(risk).toFixed(2)}</b>`;}
 
@@ -342,6 +344,8 @@ function labReportData(){
   });
 }
 
+window.labReportData=labReportData;
+window.labPlanFor=labPlanFor;
 function labProviderKey(v){
   try{return typeof normalizeSearch==='function'?normalizeSearch(v||''):String(v||'').toLowerCase().trim()}catch{return String(v||'').toLowerCase().trim()}
 }
@@ -384,8 +388,12 @@ function renderLabReportPreview(){
 function labSaveSnapshot(){
   ensureLabState();
   persistLabState();
-  renderLaboratoryModule();
-  if(typeof renderDashboard==='function')renderDashboard();
+  // Guardado rápido: no reconstruye la guía/matriz completa.
+  renderLabStats();
+  const active=document.querySelector('.page.active')?.id||'';
+  if(active==='dashPage'&&typeof renderDashboard==='function')renderDashboard();
+  if(active==='devPage'&&typeof renderDevs==='function')renderDevs();
+  if(active==='providerMapPage'&&typeof renderProviderMapMarkers==='function')renderProviderMapMarkers();
   const lib=JSON.parse(localStorage.getItem(LAB_LIBRARY_KEY)||'{}');
   const id=`LAB_${labState.meta.reportNumber||'SN'}_${labState.meta.reportYear||new Date().getFullYear()}_${Date.now()}`;
   lib[id]={savedAt:new Date().toISOString(),state:structuredClone(labState),auditor:currentSessionUser?.email||''};

@@ -1,0 +1,8 @@
+SIAPE GAP V3.4.13
+
+- Optimización de carga: renderizado bajo demanda por pantalla.
+- Guardar auditoría ya no reconstruye toda la aplicación.
+- Mapa Prestacional toma auditorías guardadas en el dispositivo; si no hay coordenadas exactas, muestra una ubicación provincial aproximada.
+- Desvíos de Laboratorio se incorporan a Desvíos consolidados.
+- Nuevo estado de cumplimiento: <40 Malo; 40-<60 Moderado; 60-<70 Bueno; 70-75 Muy bueno; >75 Excelente.
+- Mapa circular de riesgo de Laboratorio rediseñado con estética futurista y datos dinámicos.
