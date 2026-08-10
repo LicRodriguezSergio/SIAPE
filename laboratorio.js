@@ -1,5 +1,5 @@
 
-// ===== SIAPE V3.4.4 · MÓDULO LABORATORIO + MATRIZ DINÁMICA =====
+// ===== SIAPE V3.4.12B · LABORATORIO CON CARGA DIFERIDA =====
 const LAB_KEY='siape_laboratorio_v1';
 const LAB_LIBRARY_KEY='siape_laboratorio_guardadas_v1';
 let labState=loadLabState();
@@ -12,6 +12,7 @@ function labDefaultState(){
     riskManual:{},
     interview:{date:new Date().toISOString().slice(0,10),time:'',place:'',area:'',interviewees:'',roles:'',license:'',auditors:'',summary:'',documents:'',notes:''},
     plan:{},
+    guideSection:'',
     view:'panel'
   };
 }
@@ -24,6 +25,7 @@ function ensureLabState(){
   labState.riskManual=labState.riskManual||{};
   labState.interview={...labDefaultState().interview,...(labState.interview||{})};
   labState.plan=labState.plan||{};
+  labState.guideSection=labState.guideSection||'';
 }
 let labCrossModuleTimer=null;
 function labNotifyCrossModules(){
@@ -114,8 +116,8 @@ function labShowView(view,saveView=true){
 }
 function updateLabMeta(el){
   labState.meta[el.dataset.labMeta]=el.value;
-  saveLabState();renderLabStats();
-  if(labState.view==='risk')renderLabRiskMatrix();
+  saveLabState();
+  // No recalcular indicadores mientras se escribe metadata.
 }
 function labResponseLabel(v){return ({SI:'Cumple',NO:'Desvío',NA:'No aplica',NE:'No evaluado'})[v]||'Pendiente'}
 function labCriterionDefaultDeviation(item){return `No se acredita el cumplimiento del criterio: ${item.item}.`}
@@ -168,15 +170,30 @@ function renderLabStats(){
   const el=document.getElementById('labKpis');
   if(el)el.innerHTML=`<div class="kpi"><span>Requisitos</span><b>${m.total}</b></div><div class="kpi"><span>Evaluados</span><b>${m.answered}</b></div><div class="kpi"><span>Desvíos</span><b>${m.dev}</b></div><div class="kpi"><span>Cumplimiento</span><b>${(m.compliance*100).toFixed(1)}%</b></div><div class="kpi"><span>IIRS</span><b>${m.iirs.toFixed(2)}</b></div>`;
 }
+function labGuideSections(){
+  const items=window.LAB_GUIDE_ITEMS||[];
+  return [...new Set(items.map(i=>i.section))];
+}
+function labSetGuideSection(section){
+  labState.guideSection=section;
+  saveLabState();
+  renderLabGuide();
+}
 function renderLabGuide(){
   const root=document.getElementById('labGuideItems');if(!root)return;
   const items=window.LAB_GUIDE_ITEMS||[];
-  const sections=[...new Set(items.map(i=>i.section))];
-  root.innerHTML=sections.map(section=>{
+  const sections=labGuideSections();
+  if(!sections.length){root.innerHTML='<div class="notice">No hay criterios cargados.</div>';return;}
+  if(!labState.guideSection||!sections.includes(labState.guideSection))labState.guideSection=sections[0];
+  const active=labState.guideSection;
+  const nav=sections.map(section=>{
     const rows=items.filter(i=>i.section===section);
     const completed=rows.filter(i=>['SI','NO','NA','NE'].includes(labAnswer(i.code).response)).length;
-    return `<details class="lab-section" open><summary>${esc(section)} <span>${completed}/${rows.length}</span></summary><div class="lab-items">${rows.map(labItemHtml).join('')}</div></details>`;
+    const cls=section===active?'primary':'secondary';
+    return `<button type="button" class="${cls} lab-guide-section-btn" data-lab-section="${esc(section)}">${esc(section)} <span>${completed}/${rows.length}</span></button>`;
   }).join('');
+  const rows=items.filter(i=>i.section===active);
+  root.innerHTML=`<div class="card lab-guide-section-nav"><div class="toolbar">${nav}</div><p class="small">Se muestra una sección por vez para mantener el sistema ágil.</p></div><div class="lab-section-active"><h3>${esc(active)}</h3><div class="lab-items">${rows.map(labItemHtml).join('')}</div></div>`;
 }
 function labItemHtml(item){
   const a=labAnswer(item.code), no=a.response==='NO';
@@ -209,15 +226,21 @@ function labHandleInput(e){
   if(e.target.dataset.labAction==='response'){
     a.response=e.target.dataset.value;
     if(a.response==='NO'&&!(item.suggestions||[]).length)a.deviationChoice='custom';
-    labState.answers[code]=a;saveLabState();renderLabGuide();renderLabStats();return;
+    labState.answers[code]=a;
+    saveLabState();
+    // Solo redibujar la sección visible, no los 71 criterios.
+    renderLabGuide();
+    renderLabStats();
+    return;
   }
   const f=e.target.dataset.labField;if(!f)return;
   if(f==='suggestedIndex')a.suggestedIndex=Number(e.target.value)||0;
   else if(f==='deviationChoice')a.deviationChoice=e.target.value;
   else a[f]=e.target.value;
-  labState.answers[code]=a;saveLabState();
+  labState.answers[code]=a;
+  saveLabState();
+  // Escribir observaciones o desvíos propios no provoca ningún renderizado.
   if(['suggestedIndex','deviationChoice'].includes(f))renderLabGuide();
-  renderLabStats();
 }
 function labNormText(v){
   return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
@@ -384,8 +407,9 @@ function renderLabReportPreview(){
 function labSaveSnapshot(){
   ensureLabState();
   persistLabState();
-  renderLaboratoryModule();
-  if(typeof renderDashboard==='function')renderDashboard();
+  // Guardar sin reconstruir todos los módulos pesados.
+  if(labState.view==='panel')renderLabPanel();
+  else renderLabStats();
   const lib=JSON.parse(localStorage.getItem(LAB_LIBRARY_KEY)||'{}');
   const id=`LAB_${labState.meta.reportNumber||'SN'}_${labState.meta.reportYear||new Date().getFullYear()}_${Date.now()}`;
   lib[id]={savedAt:new Date().toISOString(),state:structuredClone(labState),auditor:currentSessionUser?.email||''};
@@ -414,8 +438,15 @@ function setUserSpecialty(email){
 
 document.addEventListener('input',e=>{
   if(e.target.matches('[data-lab-meta]'))updateLabMeta(e.target);
-  if(e.target.closest('#labGuideItems'))labHandleInput(e);
+  // Solo texto libre: actualizar estado sin renderizar.
+  if(e.target.closest('#labGuideItems')&&e.target.matches('textarea[data-lab-field]'))labHandleInput(e);
 });
-document.addEventListener('change',e=>{if(e.target.closest('#labGuideItems'))labHandleInput(e)});
-document.addEventListener('click',e=>{if(e.target.closest('#labGuideItems')&&e.target.dataset.labAction==='response')labHandleInput(e)});
+document.addEventListener('change',e=>{
+  if(e.target.closest('#labGuideItems')&&e.target.matches('select[data-lab-field], input[data-lab-field]'))labHandleInput(e);
+});
+document.addEventListener('click',e=>{
+  const sec=e.target.closest('[data-lab-section]');
+  if(sec){labSetGuideSection(sec.dataset.labSection);return;}
+  if(e.target.closest('#labGuideItems')&&e.target.dataset.labAction==='response')labHandleInput(e);
+});
 document.addEventListener('DOMContentLoaded',()=>{ensureLabState()});

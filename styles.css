@@ -200,3 +200,10 @@ body:not(.locked) main,body:not(.locked) header{animation:siapeEnter .5s ease bo
 
 /* V3.4.12 · estado de guardado y autoguardado */
 .siape-save-status{position:fixed;right:18px;bottom:18px;z-index:9998;padding:8px 12px;border-radius:18px;font-size:12px;box-shadow:0 4px 18px rgba(0,0,0,.18);background:#eef3f7;color:#345;opacity:.95}.siape-save-status:empty{display:none}.siape-save-status.pending{background:#fff3cd;color:#6b5200}.siape-save-status.saved{background:#dff3e5;color:#145c2e}.siape-autosave-toast{position:fixed;left:50%;top:24px;transform:translate(-50%,-18px);z-index:10000;min-width:340px;max-width:560px;padding:14px 18px;border-radius:12px;background:#17364d;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:.2s ease}.siape-autosave-toast.show{opacity:1;transform:translate(-50%,0)}.siape-autosave-toast.done{background:#245f3a}@media(max-width:600px){.siape-autosave-toast{min-width:0;width:calc(100% - 28px);top:12px}.siape-save-status{right:10px;bottom:10px}}
+
+/* V3.4.12B · Laboratorio rápido */
+.lab-guide-section-nav{margin-bottom:14px}
+.lab-guide-section-nav .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.lab-guide-section-btn{white-space:normal;text-align:left}
+.lab-guide-section-btn span{opacity:.75;margin-left:4px;font-size:.85em}
+.lab-section-active>h3{margin:10px 0 12px}

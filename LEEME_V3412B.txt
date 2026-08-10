@@ -1,0 +1,8 @@
+SIAPE GAP V3.4.12B - LABORATORIO RÁPIDO
+
+- Laboratorio usa carga diferida por pestaña.
+- La Guía II Nivel muestra una sola sección por vez.
+- Escribir observaciones/desvíos propios no reconstruye la guía.
+- Cambiar una respuesta redibuja solo la sección visible.
+- Matriz de riesgo, informe, plan y resumen se cargan únicamente al abrir sus pestañas.
+- Guardar Laboratorio no reconstruye todos los módulos.
