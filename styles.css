@@ -207,3 +207,4 @@ body:not(.locked) main,body:not(.locked) header{animation:siapeEnter .5s ease bo
 .lab-guide-section-btn{white-space:normal;text-align:left}
 .lab-guide-section-btn span{opacity:.75;margin-left:4px;font-size:.85em}
 .lab-section-active>h3{margin:10px 0 12px}
+.lab-source-form h4{margin:18px 0 10px;padding:8px 10px;background:#eef3f7;border-left:4px solid #17678b}.lab-source-group{margin:16px 0 6px;padding:9px 12px;background:#e7eef4;border-left:4px solid #1b6283;border-radius:6px;color:#17394c}.lab-source-form table input{width:100%;min-width:0;box-sizing:border-box}.lab-source-form .lab-choice{display:block;margin:6px 0}

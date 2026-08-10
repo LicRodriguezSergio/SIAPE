@@ -78,3 +78,14 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Desvíos estandarizados ampliados con antecedentes vinculados del Excel y opción de redacción propia.
 - Pestaña activa resaltada.
 - Mapa circular multinivel de riesgo dinámico (proceso, subproceso y requisito).
+
+## V3.4.12E
+- Reemplazo de la Guía II Nivel de Laboratorio por la versión PDF recibida, respetando su estructura y códigos visibles.
+- Incorporación de los formularios de Datos, Dirección Técnica, RRHH, clasificación, informes, funcionalidad, guardia y equipamiento.
+- Los desvíos propios seleccionados por el auditor se incorporan a la biblioteca reutilizable de Laboratorio al guardar/autoguardar.
+- Se retira Plan de mejora del Área Laboratorio.
+
+
+## V3.4.12F
+- Se elimina completamente la función Plan de mejora del Área Laboratorio.
+- Se renueva la caché para evitar que el navegador conserve la interfaz anterior.

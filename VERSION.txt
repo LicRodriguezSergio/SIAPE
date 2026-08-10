@@ -1,2 +1,1 @@
-SIAPE GAP V3.4.12D
-Desvíos generales + PDF Laboratorio
+SIAPE GAP V3.4.12F - Guia Laboratorio II Nivel oficial y biblioteca dinamica

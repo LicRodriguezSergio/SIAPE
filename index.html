@@ -1,4 +1,4 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123d5a"><title>SIAPE GAP V3.4.12B · Laboratorio rápido</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""><link rel="stylesheet" href="styles.css?v=3412b"></head><body>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#123d5a"><title>SIAPE GAP V3.4.12B · Laboratorio rápido</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""><link rel="stylesheet" href="styles.css?v=3412f"></head><body>
 <div id="authGate" class="auth-gate">
   <div id="loginIntro" class="login-intro" aria-hidden="true">
     <img src="pami-logo.png" alt="">
@@ -199,7 +199,7 @@
   <div class="card lab-hero">
     <div>
       <h2>Área Laboratorio</h2>
-      <p>Panel operativo del Área Laboratorio: identificación, entrevista, guía, desvíos, matriz dinámica de riesgo e informe.</p>
+      <p>Panel operativo del Área Laboratorio: identificación, entrevista, guía oficial de II Nivel, desvíos, matriz dinámica de riesgo e informe.</p>
     </div>
     <span class="badge">Versión de prueba</span>
   </div>
@@ -223,7 +223,7 @@
       <button class="secondary lab-tab" data-view="interview" onclick="labShowView('interview')">Entrevista y notas</button>
       <button class="secondary lab-tab" data-view="guide" onclick="labShowView('guide')">Guía II Nivel</button>
       <button class="secondary lab-tab" data-view="risk" onclick="labShowView('risk')">Matriz de riesgo</button>
-      <button class="secondary lab-tab" data-view="summary" onclick="labShowView('summary')">Resumen y acta</button><button class="secondary lab-tab" data-view="plan" onclick="labShowView('plan')">Plan de mejora</button><button class="secondary lab-tab" data-view="report" onclick="labShowView('report')">Informe</button>
+      <button class="secondary lab-tab" data-view="summary" onclick="labShowView('summary')">Resumen y acta</button><button class="secondary lab-tab" data-view="report" onclick="labShowView('report')">Informe</button>
       <button class="savebtn" onclick="labSaveSnapshot()">💾 Guardar Laboratorio</button>
       <button class="secondary" onclick="labReset()">Nueva auditoría</button>
     </div>
@@ -233,7 +233,7 @@
       <div class="card"><h3>Panel general · Área Laboratorio</h3><p class="small">Resumen exclusivo de la auditoría de Laboratorio.</p><div id="labPanelKpis" class="kpis"></div><div id="labPanelProgress" class="lab-panel-progress"></div></div>
       <div class="card"><h3>Situación actual</h3><div id="labPanelStatus"></div></div>
     </div>
-    <div class="card"><h3>Accesos del Área Laboratorio</h3><div class="lab-quick-grid"><button class="secondary" onclick="labShowView('interview')">Entrevista y notas</button><button class="secondary" onclick="labShowView('guide')">Abrir Guía II Nivel</button><button class="secondary" onclick="labShowView('risk')">Ver Matriz de riesgo</button><button class="secondary" onclick="labShowView('summary')">Resumen y acta</button><button class="secondary" onclick="labShowView('plan')">Plan de mejora</button><button class="secondary" onclick="labShowView('report')">Informe</button></div></div>
+    <div class="card"><h3>Accesos del Área Laboratorio</h3><div class="lab-quick-grid"><button class="secondary" onclick="labShowView('interview')">Entrevista y notas</button><button class="secondary" onclick="labShowView('guide')">Abrir Guía II Nivel</button><button class="secondary" onclick="labShowView('risk')">Ver Matriz de riesgo</button><button class="secondary" onclick="labShowView('summary')">Resumen y acta</button><button class="secondary" onclick="labShowView('report')">Informe</button></div></div>
     <div class="grid2">
       <div class="card"><h3>Resumen ejecutivo automático · Área Laboratorio</h3><div id="labPanelExecutiveSummary" class="summary-text"></div><div class="toolbar"><button class="secondary" type="button" onclick="labCopyText('labPanelExecutiveSummary')">Copiar resumen</button><button class="secondary" type="button" onclick="labShowView('summary')">Abrir Resumen y acta</button></div></div>
       <div class="card"><h3>Síntesis de desvíos para el acta · Laboratorio</h3><div id="labPanelActSummary" class="summary-text"></div><div class="toolbar"><button class="secondary" type="button" onclick="labCopyText('labPanelActSummary')">Copiar síntesis</button><button class="secondary" type="button" onclick="labShowView('summary')">Ver detalle</button></div></div>
@@ -276,11 +276,6 @@
       <div class="card"><h3>Síntesis de desvíos para el acta · Laboratorio</h3><div id="labActSummary" class="summary-text"></div><button class="secondary" type="button" onclick="labCopyText('labActSummary')">Copiar síntesis</button></div>
     </div>
   </div>
-  <div id="labPlanView" class="lab-subview hide">
-    <div class="card"><h3>Plan de mejora · Área Laboratorio</h3><p class="small">Se genera automáticamente a partir de los desvíos seleccionados. Los campos de acción, responsable, evidencia, plazo y estado pueden completarse para cada hallazgo.</p>
-      <div class="tablewrap"><table><thead><tr><th>Código</th><th>Desvío</th><th>Riesgo</th><th>Acción correctiva</th><th>Evidencia</th><th>Responsable</th><th>Plazo</th><th>Estado</th></tr></thead><tbody id="labPlanRows"></tbody></table></div>
-    </div>
-  </div>
   <div id="labReportView" class="lab-subview hide">
     <div class="card">
       <div class="toolbar"><button class="primary" onclick="labPrintReport()">Imprimir / Guardar PDF</button><button class="secondary" onclick="renderLabReportPreview()">Actualizar vista previa</button></div>
@@ -309,4 +304,4 @@
 <section id="settingsPage" class="page"><div class="card"><h2>Configuración del auditor</h2><div class="grid"><div><label>Nombre y apellido</label><input id="profileName"></div><div><label>Matrícula / identificación</label><input id="profileLicense"></div><div><label>Institución</label><input id="profileInstitution"></div><div><label>Correo habitual</label><input id="profileEmail" type="email"></div></div><div class="toolbar"><button class="primary" onclick="saveV3Settings()">Guardar configuración local</button><button class="secondary" onclick="exportFullBackup()">Exportar respaldo completo</button><label class="secondary">Importar respaldo completo<input class="hide" type="file" accept=".json" onchange="importFullBackup(this)"></label></div><div class="notice">Los datos del perfil, auditorías y fotografías se conservan en este dispositivo. El servidor de autenticación recibe únicamente identidad y registro de acceso.</div></div></section>
 <section id="adminPage" class="page"><div class="card"><h2>Administración de usuarios</h2><p class="notice">Disponible para Administrador, Gerente, Subgerente y Jefaturas de los Departamentos de Médicas y Sociales.</p><div class="admin-toolbar"><input id="adminUserSearch" type="search" placeholder="Buscar por nombre o correo..." oninput="renderAdminUsers()"><select id="adminUserFilter" onchange="renderAdminUsers()"><option value="todos">Todos</option><option value="pendiente">Pendientes</option><option value="autorizado">Autorizados</option><option value="suspendido">Suspendidos</option><option value="rechazado">Rechazados</option></select><button class="secondary" onclick="loadAdminUsers()">Actualizar</button></div><div id="adminUserStatus" class="small"></div><div id="adminUsersList" class="admin-users"></div></div></section>
 <section id="reportPage" class="page"><div class="toolbar no-print"><button class="primary" onclick="prepareReportWithPhotos()">Preparar informe con fotografías</button><button class="primary" onclick="window.print()">Imprimir / Guardar como PDF</button><button class="secondary" onclick="shareCurrentReport()">Compartir informe</button></div><div id="reportContent"></div></section>
-</main><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=3412b"></script><script src="data.js?v=3412b"></script><script src="laboratorio-data.js?v=3412b"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script><script src="app.js?v=3412b"></script><script src="laboratorio.js?v=3412b"></script><script>if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');</script></body></html>
+</main><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=3412f"></script><script src="data.js?v=3412f"></script><script src="laboratorio-data.js?v=3412f"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script><script src="app.js?v=3412f"></script><script src="laboratorio.js?v=3412f"></script><script>if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');</script></body></html>
