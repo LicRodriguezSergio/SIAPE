@@ -1,0 +1,1 @@
+V3.4.13a: arranque liviano. Mapa se carga solo al abrirlo; ranking no se calcula al iniciar; cache renovada.

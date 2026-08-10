@@ -788,6 +788,7 @@ function renderReport(){
 }
 function renderAll(){ensureState();bindMeta();bindInterview();bindRH();renderRH();renderDashboard();renderAudit();renderSummary();renderDevs();renderNorms();renderReport();renderSavedAudits();if(isManagementRole(currentSessionUser?.role))renderExecutiveDashboard()}
 function renderActivePage(id){
+ if(id==='startPage'){renderSavedAudits();return;}
  if(id==='auditPage')renderAudit();
  else if(id==='dashPage')renderDashboard();
  else if(id==='devPage')renderDevs();
@@ -841,7 +842,7 @@ function renderRH(){
 }
 function clearRH(){if(!confirm('¿Limpiar los datos del módulo de Recursos Humanos?'))return;state.rh=defaultRH();save();bindRH();renderAll()}
 
-window.addEventListener("load",()=>{ensureState();bindMeta();bindInterview();renderSavedAudits();renderProviderRanking();updateSaveStatus();});
+window.addEventListener("load",()=>{ensureState();bindMeta();bindInterview();updateSaveStatus();});
 
 // ===== MODO IA HÍBRIDO (opcional) =====
 const AI_SETTINGS_KEY="siape_ai_settings_v2";
@@ -1074,8 +1075,21 @@ function filteredDemoProviders(){
  const risk=document.getElementById('providerMapRisk')?.value||'';
  return providerMapDataset().filter(p=>(!search||`${p.name} ${p.province} ${p.city}`.toLowerCase().includes(search))&&(!province||p.province===province)&&(!complexity||p.complexity===complexity)&&(!risk||providerRiskKey(p)===risk));
 }
+let leafletLoadPromise=null;
+function ensureLeafletLoaded(){
+ if(typeof L!=='undefined')return Promise.resolve(true);
+ if(leafletLoadPromise)return leafletLoadPromise;
+ leafletLoadPromise=new Promise(resolve=>{
+   if(!document.getElementById('leafletCssDynamic')){
+     const css=document.createElement('link');css.id='leafletCssDynamic';css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);
+   }
+   const sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';sc.async=true;
+   sc.onload=()=>resolve(true);sc.onerror=()=>resolve(false);document.head.appendChild(sc);
+ });
+ return leafletLoadPromise;
+}
 function renderProviderMap(){
- if(typeof L==='undefined'){document.getElementById('providerMapDetail').innerHTML='<h2>Mapa no disponible</h2><p>No se pudo cargar el componente cartográfico. Verifique la conexión a Internet.</p>';return}
+ if(typeof L==='undefined'){const d=document.getElementById('providerMapDetail');if(d)d.innerHTML='<h2>Cargando mapa…</h2><p>El componente cartográfico se carga solo al abrir esta pantalla para mantener SIAPE ágil.</p>';ensureLeafletLoaded().then(ok=>{if(ok)renderProviderMap();else if(d)d.innerHTML='<h2>Mapa no disponible</h2><p>No se pudo cargar el componente cartográfico. Verifique la conexión a Internet.</p>';});return}
  const select=document.getElementById('providerMapProvince');
  if(select){const current=select.value;select.innerHTML='<option value="">Todas las provincias</option>';[...new Set(providerMapDataset().map(p=>p.province).filter(Boolean))].sort().forEach(v=>select.add(new Option(v,v)));if([...select.options].some(o=>o.value===current))select.value=current;}
  if(!providerMapInstance){
