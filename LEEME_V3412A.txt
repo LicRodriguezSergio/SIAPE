@@ -1,0 +1,11 @@
+SIAPE GAP V3.4.12A - BASE ESTABLE RÁPIDA
+
+Base: V3.4.12 aportada por el usuario.
+Objetivo: recuperar velocidad sin agregar funciones nuevas.
+
+Cambios:
+- Inicio liviano: no genera informe, guías, ranking ni tableros al arrancar.
+- Renderizado bajo demanda: cada módulo se calcula al abrir su pestaña.
+- Guardar auditoría actualiza solo la pantalla visible y la biblioteca local.
+- El ranking se calcula al abrir Panel General, no en cada guardado.
+- Se conserva Laboratorio y el autoguardado de seguridad cada 10 minutos.
