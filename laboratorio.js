@@ -96,7 +96,17 @@ function applySpecialtyVisibility(){
     document.getElementById('adminNav')?.classList.add('hide');
   }
 }
+function labRemovePlanImprovementUI(){
+  const root=document.getElementById('laboratoryPage');
+  if(!root)return;
+  root.querySelectorAll('button').forEach(btn=>{
+    if((btn.textContent||'').trim().toLowerCase()==='plan de mejora')btn.remove();
+  });
+  const planView=document.getElementById('labPlanView');
+  if(planView)planView.remove();
+}
 function renderLaboratoryModule(){
+  labRemovePlanImprovementUI();
   ensureLabState();
   if(!isLaboratoryProfile()){
     const root=document.getElementById('laboratoryContent');

@@ -89,3 +89,8 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 ## V3.4.12F
 - Se elimina completamente la función Plan de mejora del Área Laboratorio.
 - Se renueva la caché para evitar que el navegador conserve la interfaz anterior.
+
+
+## V3.4.12G
+- Se elimina de forma defensiva cualquier botón Plan de mejora del Área Laboratorio.
+- Se fuerza actualización de caché y Service Worker para evitar que GitHub Pages muestre una interfaz anterior.
