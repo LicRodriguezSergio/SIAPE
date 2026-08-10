@@ -1,0 +1,12 @@
+SIAPE GAP V3.4.12D
+
+Cambios:
+- Desvíos del Área Laboratorio integrados en la solapa general Desvíos.
+- El Informe PDF general toma el desvío estandarizado o el desvío propio seleccionado en Laboratorio.
+- Se conserva la base de rendimiento V3.4.12C.
+
+Prueba recomendada:
+1. En Área Laboratorio, marcar un criterio NO.
+2. Elegir un desvío estandarizado o redactar uno propio.
+3. Abrir Desvíos y verificar que aparezca Laboratorio.
+4. Abrir Informe PDF y verificar el mismo desvío.

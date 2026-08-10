@@ -399,6 +399,11 @@ function labReportData(){
     return {code:i.code,section:i.section,item:i.item,observation:a.observation||'',deviation:labSelectedDeviation(i,a),criticality:labSuggestedCriticality(i,a)}
   });
 }
+window.labReportData=labReportData;
+window.labExecutiveText=labExecutiveText;
+window.labActText=labActText;
+window.labPlanFor=labPlanFor;
+window.labItemIIRS=labItemIIRS;
 
 function labProviderKey(v){
   try{return typeof normalizeSearch==='function'?normalizeSearch(v||''):String(v||'').toLowerCase().trim()}catch{return String(v||'').toLowerCase().trim()}
