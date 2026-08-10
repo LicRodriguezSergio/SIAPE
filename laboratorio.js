@@ -1,9 +1,15 @@
 
-// ===== SIAPE V3.4.12B · LABORATORIO CON CARGA DIFERIDA =====
+// ===== SIAPE V3.4.12C · LABORATORIO ULTRALIVIANO =====
 const LAB_KEY='siape_laboratorio_v1';
 const LAB_LIBRARY_KEY='siape_laboratorio_guardadas_v1';
 let labState=loadLabState();
 let labDirty=false;window.labDirty=false;
+// Cachés de rendimiento. La vinculación Matriz↔Guía se calcula una sola vez.
+let labRiskLinkCache=null;
+let labRiskByGuideCodeCache=null;
+let labMetricsCache=null;
+function labInvalidateMetrics(){labMetricsCache=null;}
+
 
 function labDefaultState(){
   return {
@@ -98,7 +104,6 @@ function renderLaboratoryModule(){
     if(document.activeElement!==el)el.value=labState.meta[k]||'';
   });
   labShowView(labState.view||'panel',false);
-  renderLabStats();
 }
 function labShowView(view,saveView=true){
   labState.view=view;if(saveView)saveLabState();
@@ -149,19 +154,30 @@ function labLevelToIIRS(level){
 }
 function labItemIIRS(item){
   const a=labAnswer(item.code);if(a.response!=='NO')return 0;
-  const linked=(window.LAB_RISK_MATRIX||[]).filter(r=>labRiskLinkedGuideItem(r)?.code===item.code);
+  labBuildRiskIndexes();
+  const linked=labRiskByGuideCodeCache.get(item.code)||[];
   if(linked.length)return Math.max(...linked.map(r=>labLevelToIIRS(r.nivel)));
   const cr=labCriticalityRank(labSuggestedCriticality(item,a));return cr||3;
 }
 function labAreaMetrics(){
-  ensureLabState();const items=window.LAB_GUIDE_ITEMS||[],ans=labState.answers||{};
-  const applicable=items.filter(i=>['SI','NO'].includes((ans[i.code]||{}).response));
-  const yes=applicable.filter(i=>(ans[i.code]||{}).response==='SI');
-  const dev=applicable.filter(i=>(ans[i.code]||{}).response==='NO');
-  const scores=applicable.map(i=>labItemIIRS(i));
-  const compliance=applicable.length?yes.length/applicable.length:0;
-  const iirs=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
-  return {active:applicable.length,answered:items.filter(i=>['SI','NO','NA','NE'].includes((ans[i.code]||{}).response)).length,dev:dev.length,low:dev.filter(i=>labItemIIRS(i)<=2).length,mod:dev.filter(i=>labItemIIRS(i)===3).length,high:dev.filter(i=>labItemIIRS(i)>=4).length,compliance,iirs,yes:yes.length,total:items.length};
+  if(labMetricsCache)return labMetricsCache;
+  ensureLabState();labBuildRiskIndexes();
+  const items=window.LAB_GUIDE_ITEMS||[],ans=labState.answers||{};
+  let active=0,answered=0,dev=0,yes=0,low=0,mod=0,high=0,scoreSum=0;
+  for(const i of items){
+    const response=(ans[i.code]||{}).response||'';
+    if(['SI','NO','NA','NE'].includes(response))answered++;
+    if(response!=='SI'&&response!=='NO')continue;
+    active++;
+    if(response==='SI'){yes++;continue;}
+    dev++;
+    const risk=labItemIIRS(i);scoreSum+=risk;
+    if(risk<=2)low++;else if(risk===3)mod++;else high++;
+  }
+  const compliance=active?yes/active:0;
+  const iirs=active?scoreSum/active:0;
+  labMetricsCache={active,answered,dev,low,mod,high,compliance,iirs,yes,total:items.length};
+  return labMetricsCache;
 }
 window.labAreaMetrics=labAreaMetrics;
 function labIirsBadge(v){const n=Number(v)||0;const band=n<=2?'Verde':n<4?'Moderado':'Alto';return `${n.toFixed(2)} · ${band}`;}
@@ -227,6 +243,7 @@ function labHandleInput(e){
     a.response=e.target.dataset.value;
     if(a.response==='NO'&&!(item.suggestions||[]).length)a.deviationChoice='custom';
     labState.answers[code]=a;
+    labInvalidateMetrics();
     saveLabState();
     // Solo redibujar la sección visible, no los 71 criterios.
     renderLabGuide();
@@ -238,6 +255,7 @@ function labHandleInput(e){
   else if(f==='deviationChoice')a.deviationChoice=e.target.value;
   else a[f]=e.target.value;
   labState.answers[code]=a;
+  labInvalidateMetrics();
   saveLabState();
   // Escribir observaciones o desvíos propios no provoca ningún renderizado.
   if(['suggestedIndex','deviationChoice'].includes(f))renderLabGuide();
@@ -264,10 +282,24 @@ function labRiskMatchScore(r,item){
   const rn=labNormText(r.item);if(a.includes(rn)||rn.includes(a))score+=4;
   return score;
 }
+function labBuildRiskIndexes(){
+  if(labRiskLinkCache&&labRiskByGuideCodeCache)return;
+  const items=window.LAB_GUIDE_ITEMS||[], rows=window.LAB_RISK_MATRIX||[];
+  const link=new Map(), byCode=new Map();
+  rows.forEach(r=>{
+    let best=null,bestScore=0;
+    items.forEach(i=>{const sc=labRiskMatchScore(r,i);if(sc>bestScore){best=i;bestScore=sc}});
+    const min=Math.min(2,(LAB_RISK_ALIASES[r.id]||[]).length||2);
+    if(bestScore>=min&&best){
+      link.set(String(r.id),best);
+      const arr=byCode.get(best.code)||[];arr.push(r);byCode.set(best.code,arr);
+    }else link.set(String(r.id),null);
+  });
+  labRiskLinkCache=link;labRiskByGuideCodeCache=byCode;
+}
 function labRiskLinkedGuideItem(r){
-  const items=window.LAB_GUIDE_ITEMS||[];let best=null,bestScore=0;
-  items.forEach(i=>{const sc=labRiskMatchScore(r,i);if(sc>bestScore){best=i;bestScore=sc}});
-  return bestScore>=Math.min(2,(LAB_RISK_ALIASES[r.id]||[]).length||2)?best:null;
+  labBuildRiskIndexes();
+  return labRiskLinkCache.get(String(r.id))||null;
 }
 function labRiskStatus(r){
   const linked=labRiskLinkedGuideItem(r);
@@ -309,10 +341,13 @@ function renderLabRiskDashboard(){
 }
 
 function renderLabPanel(){
-  ensureLabState();renderLabStats();const m=labAreaMetrics();
-  const panelExec=document.getElementById('labPanelExecutiveSummary');if(panelExec)panelExec.textContent=labExecutiveText();
-  const panelAct=document.getElementById('labPanelActSummary');if(panelAct)panelAct.textContent=labActText();
-  const pct=m.total?Math.round(m.answered/m.total*100):0;const interview=labState.interview||{},hasInterview=Boolean(interview.interviewees||interview.summary||interview.roles);
+  ensureLabState();const m=labAreaMetrics();
+  const exec=`La auditoría del Área Laboratorio registra ${m.active} requisitos aplicables, con un cumplimiento del ${(m.compliance*100).toFixed(1)} %. Se identificaron ${m.dev} desvíos: ${m.low} de riesgo bajo, ${m.mod} moderados y ${m.high} altos o críticos. El IIRS preliminar del Área Laboratorio es ${m.iirs.toFixed(2)} en la escala institucional de 0 a 5. La metodología específica de riesgo de Laboratorio continúa sujeta a validación técnica.`;
+  const ds=labReportData();
+  const act=ds.length?`LABORATORIO: se identificaron ${ds.length} desvíos. ${ds.slice(0,5).map(d=>d.deviation||d.item).join(' ')}`:'LABORATORIO: no se registraron desvíos para incorporar al acta.';
+  const panelExec=document.getElementById('labPanelExecutiveSummary');if(panelExec)panelExec.textContent=exec;
+  const panelAct=document.getElementById('labPanelActSummary');if(panelAct)panelAct.textContent=act;
+  const pct=m.total?Math.round(m.answered/m.total*100):0;const interview=labState.interview||{};
   const k=document.getElementById('labPanelKpis');if(k)k.innerHTML=`<div class="kpi"><span>Desvíos</span><b>${m.dev}</b></div><div class="kpi"><span>Cumplimiento</span><b>${(m.compliance*100).toFixed(1)}%</b></div><div class="kpi"><span>Bajo</span><b>${m.low}</b></div><div class="kpi"><span>Moderado</span><b>${m.mod}</b></div><div class="kpi"><span>Alto/Crítico</span><b>${m.high}</b></div><div class="kpi"><span>IIRS</span><b>${m.iirs.toFixed(2)}</b></div>`;
   const p=document.getElementById('labPanelProgress');if(p)p.innerHTML=`<div class="lab-progress-track"><div class="lab-progress-fill" style="width:${pct}%"></div></div><p class="small">${m.answered} de ${m.total} requisitos con respuesta · ${m.active} requisitos aplicables al cálculo consolidado.</p>`;
   const st=document.getElementById('labPanelStatus');if(st)st.innerHTML=`<p><b>Prestador:</b> ${esc(labState.meta.prestador||'Sin completar')}</p><p><b>Auditor/a:</b> ${esc(labState.meta.auditor||currentSessionUser?.displayName||'')}</p><p><b>Entrevistado/a:</b> ${esc(interview.interviewees||'Pendiente')}</p><p><b>Estado:</b> ${pct===100?'Guía completa':'Auditoría en curso'}</p><p><b>IIRS del Área Laboratorio:</b> ${esc(labIirsBadge(m.iirs))}</p>`;
@@ -416,7 +451,7 @@ function labSaveSnapshot(){
   localStorage.setItem(LAB_LIBRARY_KEY,JSON.stringify(lib));
   alert('Auditoría de Laboratorio guardada en este dispositivo.');
 }
-function labReset(){
+function labReset(){labInvalidateMetrics();
   if(!confirm('¿Iniciar una nueva auditoría de Laboratorio? Se limpiarán las respuestas actuales.'))return;
   const meta={...labDefaultState().meta,auditor:currentSessionUser?.displayName||''};
   labState={...labDefaultState(),meta};saveLabState();renderLaboratoryModule();

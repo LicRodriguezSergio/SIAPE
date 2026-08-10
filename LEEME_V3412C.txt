@@ -1,0 +1,1 @@
+Optimización algorítmica de Laboratorio: cache de vínculos Matriz-Guía, métricas memoizadas y eliminación de recálculos duplicados.
