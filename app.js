@@ -611,18 +611,7 @@ function renderSummary(){
 }
 function renderDevs(){
  let ds=deviations().sort((a,b)=>b.score-a.score);
- const baseRows=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${esc(i.code)}</td><td>${esc(i.service)}</td><td>${esc(i.domain)}</td><td>${esc(t.deviation)}</td><td>${esc(a.obs||"")}</td><td>${esc(t.why)}</td><td>${esc(riskLabel(i.score))}</td><td>${esc(t.rec)}</td><td>${esc(t.resp)}</td><td>${esc(t.plazo)}</td><td>${esc(normText(i.service))}</td></tr>`}).join("");
- const labRows=(typeof window.labCanAttachToGeneral==='function'&&window.labCanAttachToGeneral()&&typeof window.labReportData==='function')
-   ? window.labReportData().map(d=>{
-       const item=(window.LAB_GUIDE_ITEMS||[]).find(x=>x.code===d.code);
-       const risk=(item&&typeof window.labItemIIRS==='function')?window.labItemIIRS(item):3;
-       const plan=(typeof window.labPlanFor==='function')?window.labPlanFor(d.code):{action:'',responsible:'',deadline:''};
-       const justification='Incumplimiento del requisito auditado del Área Laboratorio conforme a la evidencia relevada.';
-       const recommendation=plan.action||'Subsanar el desvío detectado y acreditar documentalmente su regularización.';
-       return `<tr class="lab-general-deviation"><td>${esc(d.code)}</td><td>Laboratorio</td><td>${esc(d.section||'Laboratorio')}</td><td>${esc(d.deviation||d.item||'Pendiente de redacción')}</td><td>${esc(d.observation||'')}</td><td>${esc(justification)}</td><td>${esc(riskLabel(risk))}</td><td>${esc(recommendation)}</td><td>${esc(plan.responsible||'A definir')}</td><td>${esc(plan.deadline||'A definir')}</td><td>Normativa específica consignada en la Guía de Laboratorio; validar según jurisdicción y requisito.</td></tr>`;
-     }).join('')
-   : '';
- $("#devRows").innerHTML=baseRows+labRows;
+ $("#devRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${i.domain}</td><td>${t.deviation}</td><td>${a.obs||""}</td><td>${t.why}</td><td>${riskLabel(i.score)}</td><td>${t.rec}</td><td>${t.resp}</td><td>${t.plazo}</td><td>${normText(i.service)}</td></tr>`}).join("");
  $("#planRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${t.deviation}</td><td>${t.rec}</td><td>${t.ev}</td><td>${t.resp}</td><td>${t.plazo}</td><td><select onchange="setStatus('${i.code}',this.value)">${["PENDIENTE","EN PROCESO","CUMPLIDO","VERIFICADO"].map(x=>`<option ${a.status===x?"selected":""}>${x}</option>`).join("")}</select></td></tr>`}).join("");
 }
 function setStatus(c,v){state.answers[c]={...answerFor(c),status:v};save()}
@@ -740,10 +729,10 @@ function renderReport(){
  const baseIirs=currentIIRS().value||0;
  const pooledIirs=pooledActive?((baseIirs*s.active)+(attachLab?lm.iirs*lm.active:0))/pooledActive:baseIirs;
  const auditedAll=[...audited];if(attachLab&&!auditedAll.includes('Laboratorio'))auditedAll.push('Laboratorio');
- const labExecutive=attachLab&&typeof window.labExecutiveText==='function'?window.labExecutiveText():'';
+ const labExecutive=attachLab&&typeof labExecutiveText==='function'?labExecutiveText():'';
  const combinedExecutive=[executive(),labExecutive].filter(Boolean).join(' ');
  const labSection=attachLab&&typeof window.labGeneralReportSection==='function'?window.labGeneralReportSection():'';
- const labDs=attachLab&&typeof window.labReportData==='function'?window.labReportData():[];
+ const labDs=attachLab&&typeof labReportData==='function'?labReportData():[];
  const labTech=labDs.length?`<h3 class="area-heading">LABORATORIO</h3>${labDs.map(d=>`<div class="deviation-block"><h4>${esc(d.code)} · ${esc(d.deviation||d.item)}</h4>${d.observation?`<p><b>Observación y evidencia:</b> ${esc(d.observation)}</p>`:''}<p><b>Requisito:</b> ${esc(d.item)}</p><p><b>Área/proceso:</b> ${esc(d.section)}</p></div>`).join('')}`:'';
  $("#reportContent").innerHTML=`<div class="report">
  <section class="cover"><h1>INFORME EJECUTIVO N° ${esc(localReportId())}</h1><h2>AUDITORÍA INTEGRAL PRESTACIONAL</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||"PRESTADOR")}</div></section>
@@ -752,9 +741,9 @@ function renderReport(){
  <section class="report-section"><h1>2. RESUMEN EJECUTIVO</h1><p>${esc(combinedExecutive)}</p>${bullets.length?`<p>En tal sentido se verificó:</p><ul class="red-list">${bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}<p>La evaluación consolidada comprende ${pooledActive} requisitos aplicables. Se registraron ${pooledDev} desvíos, de los cuales ${pooledHigh} son altos o críticos y ${pooledMod} moderados. El detalle se encuentra en los anexos técnicos por área.</p></section>
  <section class="report-section"><h1>3. OBJETO DE LA AUDITORÍA</h1><p>El objeto de la presente auditoría es verificar el cumplimiento del proceso prestacional en las áreas seleccionadas, conforme al vínculo prestacional con el INSSJP, evaluando aspectos legales, organizativos, técnicos y de calidad de la traza de atención y de los procesos de apoyo auditados.</p></section>
  <section class="report-section"><h1>4. ALCANCE</h1><p>Análisis del proceso prestacional mediante el relevamiento de las siguientes áreas: <b>${esc(auditedAll.join(", "))}</b>.</p><p>Para llevar adelante la tarea precitada:</p><ul>${scopeText()}</ul><p>El alcance se limita a las áreas seleccionadas y a la evidencia efectivamente disponible y observada durante el relevamiento.</p></section>
- ${interviewReportBlock()}<section class="report-section"><h1>5. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS consolidado (0–5)</th></tr><tr><td>${pooledActive}</td><td>${pooledAnswered}</td><td>${pooledDev}</td><td>${pooledMod}</td><td>${pooledHigh}</td><td>${(pooledCompliance*100).toFixed(1)}%</td><td>${Number(pooledIirs).toFixed(2)}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}${attachLab&&typeof window.labActText==='function'?` ${esc(window.labActText())}`:''}</div></section>
+ ${interviewReportBlock()}<section class="report-section"><h1>5. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS consolidado (0–5)</th></tr><tr><td>${pooledActive}</td><td>${pooledAnswered}</td><td>${pooledDev}</td><td>${pooledMod}</td><td>${pooledHigh}</td><td>${(pooledCompliance*100).toFixed(1)}%</td><td>${Number(pooledIirs).toFixed(2)}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}${attachLab&&typeof labActText==='function'?` ${esc(labActText())}`:''}</div></section>
  ${labSection}
- <section class="report-section"><h1>7. CONCLUSIONES</h1><p>${esc(conclusionsText())}${attachLab&&typeof window.labExecutiveText==='function'?` ${esc(window.labExecutiveText())}`:''}</p></section>
+ <section class="report-section"><h1>7. CONCLUSIONES</h1><p>${esc(conclusionsText())}${attachLab&&typeof labExecutiveText==='function'?` ${esc(labExecutiveText())}`:''}</p></section>
  <section class="report-section"><h1>8. ANEXO TÉCNICO LEGAL</h1>${legalAnnex()}${attachLab?'<h3>Laboratorio</h3><p>Se incorpora la normativa específica consignada en la guía y matriz técnica de Laboratorio, sujeta a validación según jurisdicción, nivel y requisito.</p>':''}<p class="small">Las referencias normativas deben validarse según jurisdicción, nivel, tipo de establecimiento y requisito concreto antes de citar artículos específicos.</p></section>
  <section class="report-section"><h1>9. ANEXO TÉCNICO OPERATIVO - DESVÍOS POR ÁREA Y PROCESO</h1>${technicalAnnex()}${labTech}</section>
  <div class="signature">Firma del auditor</div></div>`;

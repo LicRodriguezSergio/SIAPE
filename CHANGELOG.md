@@ -79,23 +79,13 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Pestaña activa resaltada.
 - Mapa circular multinivel de riesgo dinámico (proceso, subproceso y requisito).
 
-## V3.4.12E
-- Reemplazo de la Guía II Nivel de Laboratorio por la versión PDF recibida, respetando su estructura y códigos visibles.
-- Incorporación de los formularios de Datos, Dirección Técnica, RRHH, clasificación, informes, funcionalidad, guardia y equipamiento.
-- Los desvíos propios seleccionados por el auditor se incorporan a la biblioteca reutilizable de Laboratorio al guardar/autoguardar.
-- Se retira Plan de mejora del Área Laboratorio.
+
+## V3.4.12C1
+- Base estable V3.4.12C.
+- Se elimina Plan de mejora del Área Laboratorio.
+- Se agrega firma táctil en Entrevista y notas, cargada solo al abrir esa pestaña.
 
 
-## V3.4.12F
-- Se elimina completamente la función Plan de mejora del Área Laboratorio.
-- Se renueva la caché para evitar que el navegador conserve la interfaz anterior.
-
-
-## V3.4.12H
-- Se elimina de forma defensiva cualquier botón Plan de mejora del Área Laboratorio.
-- Se fuerza actualización de caché y Service Worker para evitar que GitHub Pages muestre una interfaz anterior.
-
-
-## V3.4.12H
-- Se incorpora firma manuscrita táctil del profesional entrevistado en Área Laboratorio.
-- La firma se guarda con nombre, cargo, matrícula, fecha/hora y se incorpora al informe de Laboratorio.
+## V3.4.12C2
+- Se elimina completamente la vista Plan de mejora del Área Laboratorio.
+- Se conserva la base ultraliviana y la firma táctil de Entrevista y notas.

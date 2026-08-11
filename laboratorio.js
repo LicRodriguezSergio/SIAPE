@@ -1,8 +1,7 @@
 
-// ===== SIAPE V3.4.12C · LABORATORIO ULTRALIVIANO =====
+// ===== SIAPE V3.4.12C21 · LABORATORIO ULTRALIVIANO =====
 const LAB_KEY='siape_laboratorio_v1';
 const LAB_LIBRARY_KEY='siape_laboratorio_guardadas_v1';
-const LAB_CUSTOM_DEV_KEY='siape_laboratorio_desvios_biblioteca_v1';
 let labState=loadLabState();
 let labDirty=false;window.labDirty=false;
 // Cachés de rendimiento. La vinculación Matriz↔Guía se calcula una sola vez.
@@ -19,7 +18,6 @@ function labDefaultState(){
     riskManual:{},
     interview:{date:new Date().toISOString().slice(0,10),time:'',place:'',area:'',interviewees:'',roles:'',license:'',auditors:'',summary:'',documents:'',notes:'',signature:{name:'',role:'',license:'',dateTime:'',image:'',confirmed:false}},
     plan:{},
-    guideForm:{prestador:'',fecha:new Date().toISOString().slice(0,10),entrevistada:'',cargo:'',dtNombre:'',dtEspecialidad:'',dtMatricula:'',rhBioquimicos:'',rhTecnicos:'',rhAdministrativos:'',rhLimpieza:'',bioqHorarios:{},clasificacionPropio:false,clasificacionTercerizado:false,clasificacionMixto:false,clasificacionInterno:false,clasificacionExterno:false,clasificacionMixto2:false,ubicacion:'',informePapel:false,informeElectronico:false,pacientesDia:'',funcHorarios:{},guardiaActiva:false,guardiaPasiva:false,conBioquimico:false,sinBioquimico:false,equipManual:false,equipAutomatico:false,equipMixto:false,equipos:{},otrosEquipos:''},
     guideSection:'',
     view:'panel'
   };
@@ -34,8 +32,6 @@ function ensureLabState(){
   labState.interview={...labDefaultState().interview,...(labState.interview||{})};
   labState.interview.signature={...labDefaultState().interview.signature,...((labState.interview||{}).signature||{})};
   labState.plan=labState.plan||{};
-  labState.guideForm={...labDefaultState().guideForm,...(labState.guideForm||{})};
-  labState.guideForm.bioqHorarios=labState.guideForm.bioqHorarios||{};labState.guideForm.funcHorarios=labState.guideForm.funcHorarios||{};labState.guideForm.equipos=labState.guideForm.equipos||{};
   labState.guideSection=labState.guideSection||'';
 }
 let labCrossModuleTimer=null;
@@ -52,7 +48,6 @@ function labNotifyCrossModules(){
 }
 function persistLabState(){
   ensureLabState();
-  labPromoteCustomDeviations();
   localStorage.setItem(LAB_KEY,JSON.stringify(labState));
   labDirty=false;window.labDirty=false;
   if(typeof updateSaveStatus==='function')updateSaveStatus();
@@ -97,17 +92,7 @@ function applySpecialtyVisibility(){
     document.getElementById('adminNav')?.classList.add('hide');
   }
 }
-function labRemovePlanImprovementUI(){
-  const root=document.getElementById('laboratoryPage');
-  if(!root)return;
-  root.querySelectorAll('button').forEach(btn=>{
-    if((btn.textContent||'').trim().toLowerCase()==='plan de mejora')btn.remove();
-  });
-  const planView=document.getElementById('labPlanView');
-  if(planView)planView.remove();
-}
 function renderLaboratoryModule(){
-  labRemovePlanImprovementUI();
   ensureLabState();
   if(!isLaboratoryProfile()){
     const root=document.getElementById('laboratoryContent');
@@ -128,10 +113,11 @@ function labShowView(view,saveView=true){
   document.getElementById(map[view]||'labPanelView')?.classList.remove('hide');
   document.querySelectorAll('.lab-tab').forEach(b=>{const on=b.dataset.view===view;b.classList.toggle('active',on);b.classList.toggle('primary',on);b.classList.toggle('secondary',!on)});
   if(view==='panel')renderLabPanel();
-  if(view==='interview')renderLabInterview();
+  if(view==='interview'){renderLabInterview();setTimeout(labInitSignaturePad,0);}
   if(view==='guide')renderLabGuide();
   if(view==='risk')renderLabRiskMatrix();
   if(view==='summary')renderLabSummary();
+  
   if(view==='report')renderLabReportPreview();
 }
 function updateLabMeta(el){
@@ -141,18 +127,10 @@ function updateLabMeta(el){
 }
 function labResponseLabel(v){return ({SI:'Cumple',NO:'Desvío',NA:'No aplica',NE:'No evaluado'})[v]||'Pendiente'}
 function labCriterionDefaultDeviation(item){return `No se acredita el cumplimiento del criterio: ${item.item}.`}
-function labCustomLibrary(){try{return JSON.parse(localStorage.getItem(LAB_CUSTOM_DEV_KEY)||'[]')}catch{return []}}
-function labCriterionLibraryKey(item){return labNormText(item.item||item.displayCode||item.code)}
-function labPromoteCustomDeviations(){
-  const lib=labCustomLibrary(),seen=new Set(lib.map(x=>labNormText((x.key||'')+'|'+(x.text||''))));let changed=false;
-  for(const item of (window.LAB_GUIDE_ITEMS||[])){const a=labAnswer(item.code);const text=String(a.customDeviation||'').trim();if(a.response!=='NO'||a.deviationChoice!=='custom'||!text)continue;const key=labCriterionLibraryKey(item),sig=labNormText(key+'|'+text);if(seen.has(sig))continue;lib.push({key,code:item.displayCode||item.code,item:item.item,text,createdAt:new Date().toISOString(),auditor:currentSessionUser?.email||currentSessionUser?.displayName||''});seen.add(sig);changed=true;}
-  if(changed)localStorage.setItem(LAB_CUSTOM_DEV_KEY,JSON.stringify(lib));
-}
 function labStandardDeviations(item){
   const coded=(item.suggestions||[]).map(x=>({kind:'coded',code:x.code,text:x.text,criticality:x.criticality||'',category:x.category||''}));
   const historical=(item.examples||[]).map((x,i)=>({kind:'historical',code:'ANT-'+String(i+1).padStart(2,'0'),text:x,criticality:'',category:'Antecedente'}));
-  const custom=labCustomLibrary().filter(x=>x.key===labCriterionLibraryKey(item)).map((x,i)=>({kind:'library',code:'BIB-'+String(i+1).padStart(2,'0'),text:x.text,criticality:'',category:'Biblioteca Laboratorio'}));
-  const seen=new Set();return [...coded,...historical,...custom].filter(x=>{const k=String(x.text||'').trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true});
+  const seen=new Set();return [...coded,...historical].filter(x=>{const k=String(x.text||'').trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true});
 }
 function labSelectedDeviation(item,a){
   if(a.response!=='NO')return '';
@@ -218,15 +196,6 @@ function labSetGuideSection(section){
   saveLabState();
   renderLabGuide();
 }
-function labGuideFormInput(key,label,type='text',extra=''){const v=labState.guideForm?.[key]??'';return `<div><label>${esc(label)}</label><input ${type==='date'?'type="date"':''} data-lab-guideform="${esc(key)}" value="${esc(v)}" ${extra}></div>`;}
-function labGuideHeaderForm(){
-  const f=labState.guideForm||{},days=['LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO','DOMINGO'];
-  const equip=['Microscopio','Cámara de Neubauer','Espectrofotómetro','Baño termostático','Microcentrífuga','Autoanalizador/es de química clínica','Contador/es hematológicos','Coagulómetro','Analizador de electrolitos: Método ion selectivo/ fotómetro de llama'];
-  const checks=(pairs)=>pairs.map(([k,l])=>`<label class="lab-choice"><input type="checkbox" data-lab-guideform="${k}" ${f[k]?'checked':''}> ${esc(l)}</label>`).join('');
-  const sched=(key)=>`<div class="tablewrap"><table><thead><tr><th>DÍAS</th><th>HORARIOS</th></tr></thead><tbody>${days.map(d=>`<tr><td>${d}</td><td><input data-lab-schedule="${key}" data-day="${d}" value="${esc((f[key]||{})[d]||'')}"></td></tr>`).join('')}</tbody></table></div>`;
-  const eq=`<div class="tablewrap"><table><thead><tr><th>EQUIPAMIENTO</th><th>CANTIDAD</th><th>OBSERVACIONES</th></tr></thead><tbody>${equip.map(n=>{const e=(f.equipos||{})[n]||{};return `<tr><td>${esc(n)}</td><td><input data-lab-equipment="${esc(n)}" data-eqfield="cantidad" value="${esc(e.cantidad||'')}"></td><td><input data-lab-equipment="${esc(n)}" data-eqfield="observacion" value="${esc(e.observacion||'')}"></td></tr>`}).join('')}</tbody></table></div>`;
-  return `<div class="card lab-source-form"><h3>Guía II Nivel · Datos y relevamiento</h3><p class="small">Formulario reproducido de la guía recibida de Laboratorio.</p><h4>DATOS</h4><div class="grid">${labGuideFormInput('prestador','Prestador / Oferente')}${labGuideFormInput('fecha','Fecha de la auditoría','date')}${labGuideFormInput('entrevistada','Persona entrevistada')}${labGuideFormInput('cargo','Función/cargo')}</div><h4>DIRECCIÓN TÉCNICA</h4><div class="grid">${labGuideFormInput('dtNombre','Nombre')}${labGuideFormInput('dtEspecialidad','Especialidad')}${labGuideFormInput('dtMatricula','Matrícula')}</div><h4>RECURSOS HUMANOS</h4><div class="grid">${labGuideFormInput('rhBioquimicos','Cantidad de Bioquímicos/as')}${labGuideFormInput('rhTecnicos','Técnicos de laboratorio')}${labGuideFormInput('rhAdministrativos','Administrativos/as')}${labGuideFormInput('rhLimpieza','Personal de limpieza')}</div><label>Días y horarios de Bioquímicos/as</label>${sched('bioqHorarios')}<h4>CLASIFICACIÓN DEL SERVICIO</h4><div class="grid2"><div>${checks([['clasificacionPropio','PROPIO'],['clasificacionTercerizado','TERCERIZADO'],['clasificacionMixto','MIXTO']])}</div><div>${checks([['clasificacionInterno','INTERNO'],['clasificacionExterno','EXTERNO'],['clasificacionMixto2','MIXTO']])}</div></div>${labGuideFormInput('ubicacion','Ubicación')}<h4>INFORMES DE LABORATORIO</h4>${checks([['informePapel','EN PAPEL'],['informeElectronico','ELECTRÓNICO']])}${labGuideFormInput('pacientesDia','Promedio de la cantidad de pacientes atendidos por día')}<h4>FUNCIONALIDAD</h4><label>Días y horarios de funcionamiento</label>${sched('funcHorarios')}<h4>GUARDIA</h4><div class="grid2"><div>${checks([['guardiaActiva','GUARDIA ACTIVA'],['conBioquimico','CON BIOQUÍMICO/A']])}</div><div>${checks([['guardiaPasiva','GUARDIA PASIVA'],['sinBioquimico','SIN BIOQUÍMICO/A']])}</div></div><h4>EQUIPAMIENTO</h4>${checks([['equipManual','MANUAL'],['equipAutomatico','AUTOMÁTICO'],['equipMixto','MIXTO']])}${eq}<label>AGREGAR OTROS</label><textarea rows="3" data-lab-guideform="otrosEquipos">${esc(f.otrosEquipos||'')}</textarea></div>`;
-}
 function renderLabGuide(){
   const root=document.getElementById('labGuideItems');if(!root)return;
   const items=window.LAB_GUIDE_ITEMS||[];
@@ -234,10 +203,14 @@ function renderLabGuide(){
   if(!sections.length){root.innerHTML='<div class="notice">No hay criterios cargados.</div>';return;}
   if(!labState.guideSection||!sections.includes(labState.guideSection))labState.guideSection=sections[0];
   const active=labState.guideSection;
-  const nav=sections.map(s=>`<button type="button" class="${s===active?'primary':'secondary'}" data-lab-section="${esc(s)}">${esc(s)}</button>`).join('');
-  const rows=items.filter(i=>i.section===active);let lastGroup='';let body='';
-  for(const item of rows){if(item.group&&item.group!==lastGroup){body+=`<div class="lab-source-group"><b>${esc(item.group)}</b></div>`;lastGroup=item.group;}body+=labItemHtml(item);}
-  root.innerHTML=`${labGuideHeaderForm()}<div class="card lab-guide-section-nav"><div class="toolbar">${nav}</div><p class="small">Se muestra una sección por vez para mantener el sistema ágil.</p></div><div class="lab-section-active"><h3>${esc(active)}</h3><div class="lab-items">${body}</div></div>`;
+  const nav=sections.map(section=>{
+    const rows=items.filter(i=>i.section===section);
+    const completed=rows.filter(i=>['SI','NO','NA','NE'].includes(labAnswer(i.code).response)).length;
+    const cls=section===active?'primary':'secondary';
+    return `<button type="button" class="${cls} lab-guide-section-btn" data-lab-section="${esc(section)}">${esc(section)} <span>${completed}/${rows.length}</span></button>`;
+  }).join('');
+  const rows=items.filter(i=>i.section===active);
+  root.innerHTML=`<div class="card lab-guide-section-nav"><div class="toolbar">${nav}</div><p class="small">Se muestra una sección por vez para mantener el sistema ágil.</p></div><div class="lab-section-active"><h3>${esc(active)}</h3><div class="lab-items">${rows.map(labItemHtml).join('')}</div></div>`;
 }
 function labItemHtml(item){
   const a=labAnswer(item.code), no=a.response==='NO';
@@ -245,7 +218,7 @@ function labItemHtml(item){
   const selected=Number(a.suggestedIndex)||0;
   const choice=a.deviationChoice||'suggested';
   return `<article class="lab-item ${no?'lab-item-deviation':''}" data-lab-code="${esc(item.code)}">
-    <div class="lab-item-head"><div><b>${esc(item.displayCode||item.code)}</b><div class="lab-item-title">${esc(item.item)}</div></div><span class="lab-response lab-response-${esc(a.response||'P')}">${esc(labResponseLabel(a.response))}</span></div>
+    <div class="lab-item-head"><div><b>${esc(item.code)}</b><div class="lab-item-title">${esc(item.item)}</div></div><span class="lab-response lab-response-${esc(a.response||'P')}">${esc(labResponseLabel(a.response))}</span></div>
     <div class="lab-response-buttons" role="group" aria-label="Respuesta">
       ${['SI','NO','NA','NE'].map(v=>`<button type="button" class="${a.response===v?'selected':''}" data-lab-action="response" data-value="${v}">${v==='NE'?'NO EVALUADO':v}</button>`).join('')}
     </div>
@@ -254,7 +227,7 @@ function labItemHtml(item){
     ${no?`<div class="lab-deviation-box">
       <h4>Desvío para el informe</h4>
       ${suggestions.length?`<label class="lab-choice"><input type="radio" name="dev-${safeDomId(item.code)}" data-lab-field="deviationChoice" value="suggested" ${choice!=='custom'?'checked':''}> Usar observación/desvío estandarizado del material de Laboratorio</label>
-      <select data-lab-field="suggestedIndex">${suggestions.map((s,idx)=>`<option value="${idx}" ${idx===selected?'selected':''}>${s.kind==='historical'?'Antecedente estandarizado':s.kind==='library'?'Biblioteca Laboratorio':esc(s.code)} · ${esc(s.text)}${s.criticality?' · '+esc(s.criticality):''}</option>`).join('')}</select>`:
+      <select data-lab-field="suggestedIndex">${suggestions.map((s,idx)=>`<option value="${idx}" ${idx===selected?'selected':''}>${s.kind==='historical'?'Antecedente estandarizado':esc(s.code)} · ${esc(s.text)}${s.criticality?' · '+esc(s.criticality):''}</option>`).join('')}</select>`:
       `<div class="notice">Este criterio no tiene todavía un desvío estandarizado vinculado en el archivo recibido. Puede redactarse un desvío propio sin alterar el criterio original.</div>`}
       <label class="lab-choice"><input type="radio" name="dev-${safeDomId(item.code)}" data-lab-field="deviationChoice" value="custom" ${choice==='custom'||!suggestions.length?'checked':''}> Omitir el estandarizado y redactar observación/desvío propio</label>
       <textarea rows="3" data-lab-field="customDeviation" placeholder="Escriba el desvío tal como desea que figure en el informe...">${esc(a.customDeviation||'')}</textarea>
@@ -386,130 +359,44 @@ function renderLabSummary(){const e=document.getElementById('labExecutiveSummary
 function labCopyText(id){const t=document.getElementById(id)?.textContent||'';navigator.clipboard?.writeText(t).then(()=>alert('Texto copiado.')).catch(()=>prompt('Copie el texto:',t));}
 
 let labSignatureDrawing=false;
-let labSignatureDirty=false;
-
-function labSignatureCanvas(){
-  return document.getElementById('labSignaturePad');
-}
-
-function labSignaturePoint(ev,canvas){
-  const rect=canvas.getBoundingClientRect();
-  const t=ev.touches&&ev.touches[0]?ev.touches[0]:ev;
-  return {
-    x:(t.clientX-rect.left)*(canvas.width/rect.width),
-    y:(t.clientY-rect.top)*(canvas.height/rect.height)
-  };
-}
-
+function labSignatureCanvas(){return document.getElementById('labSignaturePad')}
+function labSignaturePoint(ev,c){const r=c.getBoundingClientRect();return{x:(ev.clientX-r.left)*(c.width/r.width),y:(ev.clientY-r.top)*(c.height/r.height)}}
 function labInitSignaturePad(){
   ensureLabState();
-  const canvas=labSignatureCanvas();
-  if(!canvas || canvas.dataset.bound==='1') {
-    labRenderSignatureState();
-    return;
+  const c=labSignatureCanvas(); if(!c)return;
+  if(c.dataset.bound!=='1'){
+    c.dataset.bound='1';
+    const x=c.getContext('2d'); x.lineWidth=4; x.lineCap='round'; x.lineJoin='round'; x.strokeStyle='#111';
+    c.addEventListener('pointerdown',ev=>{ev.preventDefault();labSignatureDrawing=true;const p=labSignaturePoint(ev,c);x.beginPath();x.moveTo(p.x,p.y);c.setPointerCapture?.(ev.pointerId)});
+    c.addEventListener('pointermove',ev=>{if(!labSignatureDrawing)return;ev.preventDefault();const p=labSignaturePoint(ev,c);x.lineTo(p.x,p.y);x.stroke()});
+    const end=ev=>{if(!labSignatureDrawing)return;ev.preventDefault();labSignatureDrawing=false;try{c.releasePointerCapture?.(ev.pointerId)}catch{}};
+    c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end); c.addEventListener('pointerleave',end);
   }
-  canvas.dataset.bound='1';
-  const ctx=canvas.getContext('2d');
-  ctx.lineWidth=4;
-  ctx.lineCap='round';
-  ctx.lineJoin='round';
-  ctx.strokeStyle='#111';
-
-  const start=(ev)=>{
-    ev.preventDefault();
-    labSignatureDrawing=true;
-    labSignatureDirty=true;
-    const p=labSignaturePoint(ev,canvas);
-    ctx.beginPath();
-    ctx.moveTo(p.x,p.y);
-  };
-  const move=(ev)=>{
-    if(!labSignatureDrawing)return;
-    ev.preventDefault();
-    const p=labSignaturePoint(ev,canvas);
-    ctx.lineTo(p.x,p.y);
-    ctx.stroke();
-  };
-  const end=(ev)=>{
-    if(!labSignatureDrawing)return;
-    if(ev)ev.preventDefault();
-    labSignatureDrawing=false;
-  };
-
-  canvas.addEventListener('pointerdown',start);
-  canvas.addEventListener('pointermove',move);
-  window.addEventListener('pointerup',end);
-  canvas.addEventListener('touchstart',start,{passive:false});
-  canvas.addEventListener('touchmove',move,{passive:false});
-  canvas.addEventListener('touchend',end,{passive:false});
-
   labRenderSignatureState();
 }
-
 function labRenderSignatureState(){
-  ensureLabState();
-  const sig=labState.interview.signature||{};
-  document.querySelectorAll('[data-lab-signature]').forEach(el=>{
-    const k=el.dataset.labSignature;
-    if(document.activeElement!==el)el.value=sig[k]||'';
-  });
-  const dt=document.getElementById('labSignatureDateTime');
-  if(dt)dt.value=sig.dateTime?new Date(sig.dateTime).toLocaleString('es-AR'):'';
-  const status=document.getElementById('labSignatureStatus');
-  if(status){
-    status.textContent=sig.confirmed?'Firma registrada ✓':'Sin firma';
-    status.classList.toggle('ok',!!sig.confirmed);
-  }
-  const canvas=labSignatureCanvas();
-  if(canvas){
-    const ctx=canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(sig.image){
-      const img=new Image();
-      img.onload=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height)};
-      img.src=sig.image;
-    }
-  }
-  labSignatureDirty=false;
+  ensureLabState(); const s=(labState.interview&&labState.interview.signature)||{};
+  document.querySelectorAll('[data-lab-signature]').forEach(el=>{if(document.activeElement!==el)el.value=s[el.dataset.labSignature]||''});
+  const d=document.getElementById('labSignatureDateTime'); if(d)d.value=s.dateTime?new Date(s.dateTime).toLocaleString('es-AR'):'';
+  const st=document.getElementById('labSignatureStatus'); if(st)st.textContent=s.confirmed?'Firma registrada ✓':'Sin firma';
+  const c=labSignatureCanvas(); if(c){const x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);if(s.image){const im=new Image();im.onload=()=>x.drawImage(im,0,0,c.width,c.height);im.src=s.image}}
 }
-
-function labClearSignature(){
-  ensureLabState();
-  const canvas=labSignatureCanvas();
-  if(canvas)canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
-  labState.interview.signature={name:'',role:'',license:'',dateTime:'',image:'',confirmed:false};
-  document.querySelectorAll('[data-lab-signature]').forEach(el=>el.value='');
-  const dt=document.getElementById('labSignatureDateTime');if(dt)dt.value='';
-  const status=document.getElementById('labSignatureStatus');
-  if(status){status.textContent='Sin firma';status.classList.remove('ok')}
-  labSignatureDirty=false;
-  saveLabState();
-}
-
+function labClearSignature(){ensureLabState();labState.interview.signature={name:'',role:'',license:'',dateTime:'',image:'',confirmed:false};saveLabState();labRenderSignatureState()}
 function labConfirmSignature(){
-  ensureLabState();
-  const canvas=labSignatureCanvas();
-  if(!canvas){alert('No se encontró el área de firma.');return}
-  const sig={...(labState.interview.signature||{})};
-  document.querySelectorAll('[data-lab-signature]').forEach(el=>sig[el.dataset.labSignature]=el.value.trim());
-  if(!sig.name){alert('Complete el nombre y apellido del profesional antes de confirmar la firma.');return}
-  const blank=document.createElement('canvas');
-  blank.width=canvas.width;blank.height=canvas.height;
-  const hasDrawing=canvas.toDataURL()!==blank.toDataURL();
-  if(!hasDrawing && !sig.image){alert('El profesional debe firmar dentro del recuadro antes de confirmar.');return}
-  sig.image=canvas.toDataURL('image/png');
-  sig.dateTime=new Date().toISOString();
-  sig.confirmed=true;
-  labState.interview.signature=sig;
-  saveLabState();
-  labRenderSignatureState();
-  alert('Firma registrada correctamente.');
+  ensureLabState(); const c=labSignatureCanvas(); if(!c){alert('No se encontró el recuadro de firma.');return}
+  const s={...(labState.interview.signature||{})};
+  document.querySelectorAll('[data-lab-signature]').forEach(el=>s[el.dataset.labSignature]=(el.value||'').trim());
+  if(!s.name){alert('Complete el nombre y apellido del profesional.');return}
+  const data=c.getContext('2d').getImageData(0,0,c.width,c.height).data; let ink=false;
+  for(let i=3;i<data.length;i+=4){if(data[i]!==0){ink=true;break}}
+  if(!ink&&!s.image){alert('El profesional debe firmar dentro del recuadro.');return}
+  s.image=c.toDataURL('image/png'); s.dateTime=new Date().toISOString(); s.confirmed=true; labState.interview.signature=s; saveLabState(); labRenderSignatureState(); alert('Firma registrada correctamente.');
 }
+document.addEventListener('input',ev=>{const el=ev.target.closest?.('[data-lab-signature]');if(!el)return;ensureLabState();labState.interview.signature=labState.interview.signature||{};labState.interview.signature[el.dataset.labSignature]=el.value;labState.interview.signature.confirmed=false;});
 
 function renderLabInterview(){
   ensureLabState();if(!labState.interview.auditors)labState.interview.auditors=labState.meta.auditor||currentSessionUser?.displayName||'';
   document.querySelectorAll('[data-lab-interview]').forEach(el=>{const k=el.dataset.labInterview;if(document.activeElement!==el)el.value=labState.interview[k]||'';el.oninput=()=>{labState.interview[k]=el.value;saveLabState();};});
-  setTimeout(labInitSignaturePad,0);
 }
 function labSaveInterview(){document.querySelectorAll('[data-lab-interview]').forEach(el=>labState.interview[el.dataset.labInterview]=el.value);saveLabState();renderLabPanel();alert('Entrevista de Laboratorio guardada.')}
 function labClearInterview(){if(!confirm('¿Limpiar el registro de entrevista de Laboratorio?'))return;labState.interview={...labDefaultState().interview,auditors:labState.meta.auditor||currentSessionUser?.displayName||''};saveLabState();renderLabInterview();}
@@ -535,7 +422,7 @@ function renderLabRiskMatrix(){
   body.innerHTML=rows.map(r=>{
     const st=labRiskStatus(r), current=labRiskCurrent(r), linked=st.linked;
     const response=st.response||'';
-    const responseUi=linked?`<div class="lab-risk-response"><b>${esc(labRiskResponseText(response))}</b><span>Guía: ${esc(linked.displayCode||linked.code)}</span></div>`:`<select class="lab-risk-manual" onchange="labSetRiskManual(${Number(r.id)},this.value)"><option value="" ${!response?'selected':''}>Pendiente</option><option value="SI" ${response==='SI'?'selected':''}>Cumple</option><option value="NO" ${response==='NO'?'selected':''}>No cumple</option><option value="NA" ${response==='NA'?'selected':''}>No aplica</option><option value="NE" ${response==='NE'?'selected':''}>No evaluado</option></select>`;
+    const responseUi=linked?`<div class="lab-risk-response"><b>${esc(labRiskResponseText(response))}</b><span>Guía: ${esc(linked.code)}</span></div>`:`<select class="lab-risk-manual" onchange="labSetRiskManual(${Number(r.id)},this.value)"><option value="" ${!response?'selected':''}>Pendiente</option><option value="SI" ${response==='SI'?'selected':''}>Cumple</option><option value="NO" ${response==='NO'?'selected':''}>No cumple</option><option value="NA" ${response==='NA'?'selected':''}>No aplica</option><option value="NE" ${response==='NE'?'selected':''}>No evaluado</option></select>`;
     return `<tr class="${labRiskClass(r)}"><td>${esc(r.id)}</td><td>${esc(r.proceso)}</td><td>${esc(r.subproceso)}</td><td>${esc(r.area)}</td><td>${esc(r.item)}</td><td>${esc(r.normativa)}</td><td>${responseUi}</td><td>${esc(r.incumplimiento)}</td><td>${esc(r.impacto)}</td><td>${esc(r.peso)}</td><td>${Number(r.riesgo).toFixed(2)}</td><td><b>${current===null?'—':current.toFixed(2)}</b></td><td>${esc(labRiskCurrentLevel(r))}</td><td>${esc(current&&current>0?r.criticidad:'—')}</td></tr>`;
   }).join('');
   renderLabRiskDashboard();renderLabSunburst();
@@ -544,14 +431,9 @@ function labReportData(){
   const items=window.LAB_GUIDE_ITEMS||[];
   return items.filter(i=>labAnswer(i.code).response==='NO').map(i=>{
     const a=labAnswer(i.code);
-    return {code:i.code,displayCode:i.displayCode||i.code,section:i.section,item:i.item,observation:a.observation||'',deviation:labSelectedDeviation(i,a),criticality:labSuggestedCriticality(i,a)}
+    return {code:i.code,section:i.section,item:i.item,observation:a.observation||'',deviation:labSelectedDeviation(i,a),criticality:labSuggestedCriticality(i,a)}
   });
 }
-window.labReportData=labReportData;
-window.labExecutiveText=labExecutiveText;
-window.labActText=labActText;
-window.labPlanFor=labPlanFor;
-window.labItemIIRS=labItemIIRS;
 
 function labProviderKey(v){
   try{return typeof normalizeSearch==='function'?normalizeSearch(v||''):String(v||'').toLowerCase().trim()}catch{return String(v||'').toLowerCase().trim()}
@@ -568,15 +450,15 @@ function labGeneralReportSection(){
   if(!labCanAttachToGeneral())return '';
   const m=labAreaMetrics(),ds=labReportData(),interview=labState.interview||{};
   const interviewText=[interview.interviewees&&`Entrevistado/s: ${interview.interviewees}`,interview.roles&&`Cargo/función: ${interview.roles}`,interview.summary&&`Síntesis: ${interview.summary}`].filter(Boolean).join(' · ');
-  return `<section class="report-section"><h1>ÁREA LABORATORIO</h1><table><tr><th>Requisitos evaluados</th><th>Desvíos</th><th>Bajo</th><th>Moderado</th><th>Alto/crítico</th><th>Cumplimiento</th><th>IIRS</th></tr><tr><td>${m.active}</td><td>${m.dev}</td><td>${m.low}</td><td>${m.mod}</td><td>${m.high}</td><td>${(m.compliance*100).toFixed(1)}%</td><td>${m.iirs.toFixed(2)}</td></tr></table>${interviewText?`<p><b>Entrevista:</b> ${esc(interviewText)}</p>`:''}<h2>Resumen ejecutivo</h2><p>${esc(labExecutiveText())}</p><h2>Síntesis para el acta</h2><p>${esc(labActText())}</p><h2>Desvíos de Laboratorio</h2>${ds.length?ds.map(d=>`<div class="deviation-block"><h4>${esc(d.displayCode||d.code)} · ${esc(d.section)}</h4><p><b>Requisito:</b> ${esc(d.item)}</p>${d.observation?`<p><b>Observación:</b> ${esc(d.observation)}</p>`:''}<p><b>Desvío seleccionado:</b> ${esc(d.deviation||'Pendiente de redacción')}</p>${d.criticality!=='—'?`<p><b>Criticidad de referencia:</b> ${esc(d.criticality)}</p>`:''}</div>`).join(''):'<p>No se registraron desvíos en Laboratorio.</p>'}</section>`;
+  return `<section class="report-section"><h1>ÁREA LABORATORIO</h1><table><tr><th>Requisitos evaluados</th><th>Desvíos</th><th>Bajo</th><th>Moderado</th><th>Alto/crítico</th><th>Cumplimiento</th><th>IIRS</th></tr><tr><td>${m.active}</td><td>${m.dev}</td><td>${m.low}</td><td>${m.mod}</td><td>${m.high}</td><td>${(m.compliance*100).toFixed(1)}%</td><td>${m.iirs.toFixed(2)}</td></tr></table>${interviewText?`<p><b>Entrevista:</b> ${esc(interviewText)}</p>`:''}<h2>Resumen ejecutivo</h2><p>${esc(labExecutiveText())}</p><h2>Síntesis para el acta</h2><p>${esc(labActText())}</p><h2>Desvíos de Laboratorio</h2>${ds.length?ds.map(d=>`<div class="deviation-block"><h4>${esc(d.code)} · ${esc(d.section)}</h4><p><b>Requisito:</b> ${esc(d.item)}</p>${d.observation?`<p><b>Observación:</b> ${esc(d.observation)}</p>`:''}<p><b>Desvío seleccionado:</b> ${esc(d.deviation||'Pendiente de redacción')}</p>${d.criticality!=='—'?`<p><b>Criticidad de referencia:</b> ${esc(d.criticality)}</p>`:''}</div>`).join(''):'<p>No se registraron desvíos en Laboratorio.</p>'}</section>`;
 }
 window.labCanAttachToGeneral=labCanAttachToGeneral;
 window.labGeneralReportSection=labGeneralReportSection;
 function labFollowupDeviations(){
   if(!labCanAttachToGeneral())return [];
   return labReportData().map(d=>{
-    const item=(window.LAB_GUIDE_ITEMS||[]).find(i=>i.code===d.code),risk=item?labItemIIRS(item):3;
-    return {id:d.code,area:'Laboratorio',service:d.section||'Laboratorio',risk,deviation:d.deviation||d.observation||d.item,recommendation:'Subsanar el desvío detectado y acreditar la regularización conforme al requisito auditado.',evidence:'Documentación y/o evidencia objetiva que permita verificar la subsanación.',deadline:'A definir por Seguimiento',status:'pendiente',followupNote:'',source:'laboratorio'};
+    const item=(window.LAB_GUIDE_ITEMS||[]).find(i=>i.code===d.code),p=labPlanFor(d.code),risk=item?labItemIIRS(item):3;
+    return {id:d.code,area:'Laboratorio',service:d.section||'Laboratorio',risk,deviation:d.deviation||d.observation||d.item,recommendation:p.action||'Subsanar el desvío detectado y acreditar la regularización conforme al requisito auditado.',evidence:p.evidence||'Documentación y/o evidencia objetiva que permita verificar la subsanación.',deadline:p.deadline||'A definir por Seguimiento',status:'pendiente',followupNote:'',source:'laboratorio'};
   });
 }
 window.labFollowupDeviations=labFollowupDeviations;
@@ -588,11 +470,9 @@ function renderLabReportPreview(){
     <p><b>Provincia:</b> ${esc(labState.meta.province||'—')} &nbsp; <b>UGL:</b> ${esc(labState.meta.ugl||'—')} &nbsp; <b>Fecha:</b> ${esc(labState.meta.date||'—')}</p>
     <p><b>Auditor/a:</b> ${esc(labState.meta.auditor||currentSessionUser?.displayName||'—')}</p>
     <h3>Resumen ejecutivo</h3><p>${esc(labExecutiveText())}</p><h3>Síntesis para el acta</h3><p>${esc(labActText())}</p><h3>Desvíos seleccionados (${ds.length})</h3>
-    ${ds.length?ds.map(d=>`<div class="lab-report-dev"><b>${esc(d.displayCode||d.code)} · ${esc(d.section)}</b><p>${esc(d.item)}</p><p><b>Observación:</b> ${esc(d.observation||'—')}</p><p><b>Desvío:</b> ${esc(d.deviation||'Pendiente de redacción')}</p>${d.criticality!=='—'?`<p><b>Criticidad de referencia:</b> ${esc(d.criticality)}</p>`:''}</div>`).join(''):'<p>No se registraron respuestas NO.</p>'}
+    ${ds.length?ds.map(d=>`<div class="lab-report-dev"><b>${esc(d.code)} · ${esc(d.section)}</b><p>${esc(d.item)}</p><p><b>Observación:</b> ${esc(d.observation||'—')}</p><p><b>Desvío:</b> ${esc(d.deviation||'Pendiente de redacción')}</p>${d.criticality!=='—'?`<p><b>Criticidad de referencia:</b> ${esc(d.criticality)}</p>`:''}</div>`).join(''):'<p>No se registraron respuestas NO.</p>'}
     <p class="small"><b>Nota metodológica:</b> la matriz de riesgo de Laboratorio se incorpora como versión preliminar y queda sujeta a validación técnica del área.</p>
   </div>`;
-
-  const _sigTarget=document.getElementById('labReportPreview');if(_sigTarget)_sigTarget.insertAdjacentHTML('beforeend',labSignatureReportHTML());
 }
 function labSaveSnapshot(){
   ensureLabState();
@@ -619,7 +499,6 @@ function labPrintReport(){
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Laboratorio · ${esc(labState.meta.prestador||'Informe')}</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h2{border-bottom:2px solid #123d5a;padding-bottom:8px}.lab-report-dev{border:1px solid #bbb;border-radius:8px;padding:12px;margin:12px 0}.small{font-size:12px;color:#555}@media print{body{margin:14mm}}</style></head><body>${html}</body></html>`);
   w.document.close();setTimeout(()=>w.print(),300);
 }
-function labUpdateGuideForm(el){ensureLabState();const f=labState.guideForm;if(el.dataset.labGuideform){const k=el.dataset.labGuideform;f[k]=el.type==='checkbox'?el.checked:el.value;}else if(el.dataset.labSchedule){const k=el.dataset.labSchedule,d=el.dataset.day;f[k]=f[k]||{};f[k][d]=el.value;}else if(el.dataset.labEquipment){const n=el.dataset.labEquipment,k=el.dataset.eqfield;f.equipos=f.equipos||{};f.equipos[n]=f.equipos[n]||{};f.equipos[n][k]=el.value;}saveLabState();}
 function setUserSpecialty(email){
   if(!isManagementRole(currentSessionUser?.role))return;
   const el=document.getElementById('specialty-'+safeDomId(email));if(!el)return;
@@ -629,12 +508,10 @@ function setUserSpecialty(email){
 
 document.addEventListener('input',e=>{
   if(e.target.matches('[data-lab-meta]'))updateLabMeta(e.target);
-  if(e.target.matches('[data-lab-guideform],[data-lab-schedule],[data-lab-equipment]'))labUpdateGuideForm(e.target);
   // Solo texto libre: actualizar estado sin renderizar.
   if(e.target.closest('#labGuideItems')&&e.target.matches('textarea[data-lab-field]'))labHandleInput(e);
 });
 document.addEventListener('change',e=>{
-  if(e.target.matches('[data-lab-guideform],[data-lab-schedule],[data-lab-equipment]'))labUpdateGuideForm(e.target);
   if(e.target.closest('#labGuideItems')&&e.target.matches('select[data-lab-field], input[data-lab-field]'))labHandleInput(e);
 });
 document.addEventListener('click',e=>{
@@ -643,27 +520,3 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#labGuideItems')&&e.target.dataset.labAction==='response')labHandleInput(e);
 });
 document.addEventListener('DOMContentLoaded',()=>{ensureLabState()});
-
-document.addEventListener('input',function(ev){
-  const el=ev.target.closest?.('[data-lab-signature]');
-  if(!el)return;
-  ensureLabState();
-  labState.interview.signature=labState.interview.signature||{};
-  labState.interview.signature[el.dataset.labSignature]=el.value;
-  labState.interview.signature.confirmed=false;
-  const status=document.getElementById('labSignatureStatus');
-  if(status){status.textContent='Firma pendiente de confirmar';status.classList.remove('ok')}
-});
-
-function labSignatureReportHTML(){
-  ensureLabState();
-  const s=(labState.interview||{}).signature||{};
-  if(!s.confirmed||!s.image)return '';
-  const fecha=s.dateTime?new Date(s.dateTime).toLocaleString('es-AR'):'';
-  return `<div class="lab-report-signature" style="margin-top:24px;border-top:1px solid #bbb;padding-top:14px">
-    <h3>Firma del profesional entrevistado/a</h3>
-    <img src="${s.image}" alt="Firma del profesional entrevistado" style="max-width:360px;width:100%;height:auto;border-bottom:1px solid #444">
-    <div><b>${esc(s.name||'')}</b>${s.role?` · ${esc(s.role)}`:''}${s.license?` · Matrícula ${esc(s.license)}`:''}</div>
-    ${fecha?`<div class="small">Firma registrada: ${esc(fecha)}</div>`:''}
-  </div>`;
-}
