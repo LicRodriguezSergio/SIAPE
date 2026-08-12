@@ -1,0 +1,9 @@
+SIAPE GAP V3.4.21
+
+INFORME INTEGRAL
+- Un único PDF por auditoría/prestador.
+- Áreas: Enfermería, Esterilización, Hemodinamia, Limpieza, Lavadero y Laboratorio, según evaluación efectiva.
+- Contenido ejecutivo: desvíos, entrevista/notas y conclusión breve por área.
+- La entrevista del Área Enfermería es única e integra las cinco guías de esa profesión.
+- Laboratorio conserva su propia entrevista/notas.
+- Las conclusiones son propuestas por SIAPE y editables por el auditor antes de imprimir.

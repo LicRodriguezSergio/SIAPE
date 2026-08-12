@@ -1,3 +1,8 @@
+## V3.4.19 · Criterio profesional del auditor
+- Textos técnicos editables/reemplazables en hallazgos NO.
+- PDF, plan, acta, desvíos y seguimiento toman el texto final del auditor.
+- Opción para restaurar sugerencias SIAPE.
+
 # SIAPE GAP V3.4.10
 
 - Se restauran íntegramente las observaciones y desvíos estandarizados de Laboratorio.
@@ -89,3 +94,21 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Mapa prestacional usa la auditoría local guardada más reciente de cada prestador, muestra IIRS/desvíos por área y utiliza ubicación aproximada por provincia cuando no existen coordenadas.
 - Seguimiento incorpora también los desvíos de Laboratorio de la auditoría actual.
 - Caché PWA actualizada a V3.4.18.
+
+## V3.4.20 - Matriz de Riesgo de Laboratorio
+- Integración de matriz de riesgo radial inspirada en el dashboard aportado.
+- Alimentación automática desde los hallazgos NO de la guía de Laboratorio.
+- Probabilidad editable 1-5, impacto desde criticidad, score 1-25.
+- Filtros Bajo/Medio/Alto/Crítico y resumen por categoría.
+- Inclusión opcional en PDF de Laboratorio.
+- Resumen de riesgo visible en Mapa Prestacional.
+- Gráfico SVG local sin nueva dependencia externa.
+- Corrección del modo impresión del informe PDF de Laboratorio.
+
+
+## V3.4.21 - Informe Integral Ejecutivo
+- Unifica Enfermería, Esterilización, Hemodinamia, Limpieza, Lavadero y Laboratorio en un solo informe.
+- El informe muestra únicamente identificación, desvíos, entrevistas/notas y conclusión breve por área.
+- Conclusiones editables por el auditor, con sugerencia SIAPE y límite de 700 caracteres (aprox. hasta 10 renglones).
+- Se elimina el acceso operativo al PDF separado de Laboratorio; ambas áreas abren el Informe Integral.
+- Fotografías del informe integral incorporan también desvíos de Laboratorio.

@@ -1,0 +1,14 @@
+SIAPE GAP V3.4.20 · MATRIZ DE RIESGO DE LABORATORIO
+
+- Agrega "Matriz de riesgo" dentro del módulo Laboratorio.
+- Se alimenta automáticamente de los requisitos de Laboratorio marcados NO.
+- Impacto: criticidad base de cada requisito (1 a 5).
+- Probabilidad: editable por el auditor (1 a 5).
+- Score complementario: Probabilidad x Impacto (1 a 25).
+- Bandas: Bajo 1-4; Medio 5-9; Alto 10-15; Crítico 16-25.
+- La probabilidad sugerida inicial utiliza la frecuencia histórica 2025 cuando está disponible, pero el auditor puede modificarla.
+- La matriz no modifica automáticamente el IIRS; funciona como análisis complementario trazable.
+- Se integra al PDF de Laboratorio (opcional mediante casilla).
+- El resumen de riesgo de Laboratorio se muestra también en el detalle del Mapa Prestacional para auditorías guardadas.
+- El gráfico radial se implementó en SVG nativo para evitar una dependencia nueva de Plotly y mejorar la estabilidad/offline.
+- Se corrigió la impresión del PDF de Laboratorio para que imprima el módulo correspondiente y no el informe de Enfermería.

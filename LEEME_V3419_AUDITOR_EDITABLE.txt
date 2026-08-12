@@ -1,0 +1,7 @@
+SIAPE GAP V3.4.19 - CRITERIO PROFESIONAL DEL AUDITOR
+
+- Cuando un requisito se marca NO, SIAPE propone textos técnicos.
+- El auditor puede editar, reemplazar o borrar Desvío, Fundamentación, Recomendación, Evidencia esperada, Responsable y Plazo.
+- La sugerencia original de SIAPE queda visible en un desplegable y puede restaurarse.
+- El PDF, Plan de mejora, Desvíos, Acta y Seguimiento utilizan el texto final del auditor.
+- La criticidad/IIRS continúa siendo la de referencia del requisito; no se modifica en esta versión para evitar inconsistencias en indicadores.

@@ -5,7 +5,7 @@ const LIBKEY="siape_profesional_v2_guardadas";
 let state=JSON.parse(localStorage.getItem(KEY)||"null")||{
  meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},
  answers:{}, enabled:Object.fromEntries(["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia","Laboratorio"].map(x=>[x,true])),
- labProfile:defaultLabProfile(), labInterview:defaultLabInterview(),
+ labProfile:defaultLabProfile(), labInterview:defaultLabInterview(), labRisk:defaultLabRisk(), areaConclusions:{},
  interview:{date:"",time:"",place:"",area:"",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true},
  rh:{service:"Internación general",shift:"Mañana",beds:0,occupied:0,normRef:"",method:"mixto",licensed:0,nurses:0,assistants:0,supervisors:0,absence:0,evidence:"",requiredNorm:0,pMin:0,mMin:0,pMod:0,mMod:0,pEsp:0,mEsp:0,pInt:0,mInt:0,productiveMinutes:360,upeTotal:0,upePerWorker:1,result:null}
 };
@@ -67,6 +67,8 @@ function ensureState(){
  state.labProfile.operationSchedule={...defaultWeekSchedule(),...(state.labProfile.operationSchedule||{})};
  state.labProfile.equipment={...defaultLabEquipment(),...(state.labProfile.equipment||{})};
  state.labInterview={...defaultLabInterview(),...(state.labInterview||{})};
+ state.labRisk={...defaultLabRisk(),...(state.labRisk||{})};state.labRisk.probabilities={...(state.labRisk.probabilities||{})};
+ state.areaConclusions={...(state.areaConclusions||{})};
  state.rh={...defaultRH(),...(state.rh||{})};
 }
 ensureState();
@@ -316,6 +318,48 @@ function technical(item,domain,service){
  }
  return {deviation:negative(item)+".",why,rec,ev,resp,plazo};
 }
+
+// V3.4.19 · Criterio profesional del auditor.
+// SIAPE propone textos técnicos, pero el auditor puede editarlos, reemplazarlos o dejarlos en blanco.
+const AUDITOR_TECH_FIELDS=['deviation','why','rec','ev','resp','plazo'];
+function finalTechnicalFor(item){
+ const base=technicalFor(item),a=answerFor(item.code),custom=a.customTechnical||{},out={...base};
+ AUDITOR_TECH_FIELDS.forEach(k=>{if(Object.prototype.hasOwnProperty.call(custom,k))out[k]=custom[k]});
+ return out;
+}
+function setTechnicalField(code,key,value){
+ const a=answerFor(code),custom={...(a.customTechnical||{})};
+ custom[key]=value;
+ state.answers[code]={...a,customTechnical:custom};
+ markDirty();
+}
+function restoreTechnicalSuggestion(code){
+ const a=answerFor(code),next={...a};
+ delete next.customTechnical;
+ state.answers[code]=next;
+ markDirty();
+ if(String(code).startsWith('LAB-'))renderLabAudit();else renderAudit();
+}
+function technicalEditorBlock(item,base,isLab=false){
+ const t=finalTechnicalFor(item);
+ const field=(label,key,rows=3)=>`<label class="auditor-final-label">${label}</label><textarea class="auditor-final-text" rows="${rows}" oninput="setTechnicalField('${item.code}','${key}',this.value)">${esc(t[key]??'')}</textarea>`;
+ return `<div class="detail auditor-editable-detail">
+   <div class="notice auditor-edit-note"><b>Texto final del auditor.</b> SIAPE precarga una sugerencia técnica. Puede editarla, reemplazarla por completo o borrar el contenido. El informe, el plan de mejora y el seguimiento utilizarán el texto que deje el auditor.</div>
+   <details class="siape-suggestion"><summary>Ver sugerencia original de SIAPE</summary>
+    <p><b>Desvío:</b> ${esc(base.deviation)}</p><p><b>Fundamentación:</b> ${esc(base.why)}</p><p><b>Recomendación:</b> ${esc(base.rec)}</p><p><b>Evidencia esperada:</b> ${esc(base.ev)}</p><p><b>Responsable:</b> ${esc(base.resp)}</p><p><b>Plazo:</b> ${esc(base.plazo)}</p>
+   </details>
+   ${field('Desvío final del auditor','deviation',3)}
+   ${field('Fundamentación técnica final','why',4)}
+   ${isLab?`<h4>Criticidad de referencia</h4><div>${esc(labCriticalityText(item))}${item.historicalFrequency!=null?` · Frecuencia histórica 2025: ${esc(labHistoricalText(item))}`:''}</div>`:''}
+   ${field('Recomendación final del auditor','rec',4)}
+   ${field('Evidencia esperada','ev',3)}
+   ${field('Responsable','resp',2)}
+   ${field('Plazo','plazo',2)}
+   ${!isLab?`<h4>Marco normativo</h4><div>${esc(normText(item.service))}</div>`:''}
+   <div class="toolbar no-print"><button class="secondary" type="button" onclick="restoreTechnicalSuggestion('${item.code}')">Restaurar sugerencias SIAPE</button></div>
+  </div>`;
+}
+
 function answerFor(code){
  if(code==="ENF-RH-001"&&state.rh?.result?.calculated)return {response:state.rh.result.hasDeficit?"NO":"SI",obs:state.rh.evidence||state.rh.result.interpretation,status:state.rh.result.hasDeficit?"DESVÍO":"CUMPLE"};
  return state.answers[code]||{response:"",obs:"",status:"PENDIENTE"}
@@ -664,7 +708,7 @@ function renderAudit(){
    <div class="responses">${["SI","NO","NA","NO EVALUADO"].map(r=>`<button class="resp ${a.response===r?"sel":""}" onclick="setResp('${i.code}','${r}')">${r==="NA"?"NO APLICA":r}</button>`).join("")}</div>
    <label>Observación y evidencia</label><textarea oninput="setObs('${i.code}',this.value)" placeholder="Describa lo observado, documentos revisados, entrevistas y evidencia directa...">${esc(a.obs)}</textarea>
    <div class="photo-tools no-print"><label class="secondary photo-button">📷 Tomar foto<input class="hide" type="file" accept="image/*" capture="environment" onchange="addEvidencePhotos('${i.code}',this.files)"></label><label class="secondary photo-button">🖼 Elegir fotos<input class="hide" type="file" accept="image/*" multiple onchange="addEvidencePhotos('${i.code}',this.files)"></label><button class="secondary" onclick="openEvidenceGallery('${i.code}')">Ver fotos <span id="photo-count-${i.code}">0</span></button></div><div id="photo-preview-${i.code}" class="photo-preview"></div>
-   ${a.response==="NO"?`<div class="detail"><h4>Desvío</h4><div>${esc(tech.deviation)}</div><h4>Fundamentación técnica</h4><div>${esc(tech.why)}</div><h4>Recomendación</h4><div>${esc(tech.rec)}</div><h4>Evidencia esperada</h4><div>${esc(tech.ev)}</div><h4>Responsable</h4><div>${esc(tech.resp)}</div><h4>Plazo</h4><div>${esc(tech.plazo)}</div><h4>Marco normativo</h4><div>${esc(normText(i.service))}</div></div>`:""}
+   ${a.response==="NO"?technicalEditorBlock(i,tech,false):""}
   </div>`;
  }).join("");
  $("#auditList").innerHTML=rhBlock+normalCards||'<div class="notice">No hay requisitos aplicables con los filtros seleccionados.</div>';
@@ -695,7 +739,7 @@ function renderLabAudit(){
   <div class="responses">${['SI','NO','NA','NO EVALUADO'].map(r=>`<button class="resp ${a.response===r?'sel':''}" onclick="setResp('${i.code}','${r}')">${r==='NA'?'NO APLICA':r}</button>`).join('')}</div>
   <label>Observación y evidencia</label><textarea oninput="setObs('${i.code}',this.value)" placeholder="Describa lo observado, documentos revisados, registros, entrevistas y evidencia directa...">${esc(a.obs)}</textarea>
   <div class="photo-tools no-print"><label class="secondary photo-button">📷 Tomar foto<input class="hide" type="file" accept="image/*" capture="environment" onchange="addEvidencePhotos('${i.code}',this.files)"></label><label class="secondary photo-button">🖼 Elegir fotos<input class="hide" type="file" accept="image/*" multiple onchange="addEvidencePhotos('${i.code}',this.files)"></label><button class="secondary" onclick="openEvidenceGallery('${i.code}')">Ver fotos <span id="photo-count-${i.code}">0</span></button></div><div id="photo-preview-${i.code}" class="photo-preview"></div>
-  ${a.response==='NO'?`<div class="detail"><h4>Desvío</h4><div>${esc(tech.deviation)}</div><h4>Fundamentación técnica</h4><div>${esc(tech.why)}</div><h4>Criticidad de referencia</h4><div>${esc(labCriticalityText(i))}${i.historicalFrequency!=null?` · Frecuencia histórica 2025: ${esc(labHistoricalText(i))}`:''}</div><h4>Recomendación</h4><div>${esc(tech.rec)}</div><h4>Evidencia esperada</h4><div>${esc(tech.ev)}</div><h4>Responsable</h4><div>${esc(tech.resp)}</div><h4>Plazo</h4><div>${esc(tech.plazo)}</div></div>`:''}
+  ${a.response==='NO'?technicalEditorBlock(i,tech,true):''}
  </div>`}).join('')||'<div class="notice">No hay requisitos de Laboratorio con los filtros seleccionados.</div>';
  refreshVisiblePhotoCounts();
 }
@@ -716,20 +760,21 @@ function labInterviewText(){const x=state.labInterview||{},parts=[];if(x.date||x
 function copyLabInterview(){const t=labInterviewText();if(!t)return alert('No hay datos de entrevista para copiar.');navigator.clipboard?.writeText(t).then(()=>alert('Registro de Laboratorio copiado.')).catch(()=>prompt('Copie el registro:',t))}
 function clearLabInterview(){if(!confirm('¿Limpiar la entrevista de Laboratorio?'))return;state.labInterview=defaultLabInterview();save();bindLabInterview()}
 function labInterviewReportBlock(){if(!state.labInterview?.includeInReport||!labInterviewHasContent())return '';const x=state.labInterview;return `<section class="report-section"><h1>5. REGISTRO DE ENTREVISTA - LABORATORIO</h1><table class="report-meta"><tr><th>Fecha</th><td>${esc(x.date||'')}</td><th>Hora</th><td>${esc(x.time||'')}</td></tr><tr><th>Lugar / modalidad</th><td>${esc(x.place||'')}</td><th>Área</th><td>Laboratorio</td></tr><tr><th>Personas entrevistadas</th><td colspan="3">${esc(x.interviewees||'')}</td></tr><tr><th>Equipo auditor</th><td colspan="3">${esc(x.auditors||'')}</td></tr></table>${x.summary?`<h2>Síntesis</h2><div class="interview-report-text">${esc(x.summary)}</div>`:''}${x.documents?`<h2>Documentación o evidencia</h2><div class="interview-report-text">${esc(x.documents)}</div>`:''}${x.commitments?`<h2>Compromisos asumidos</h2><div class="interview-report-text">${esc(x.commitments)}</div>`:''}${x.additional?`<h2>Datos adicionales</h2><div class="interview-report-text">${esc(x.additional)}</div>`:''}${x.auditorNotes?`<h2>Observaciones del auditor</h2><div class="interview-report-text">${esc(x.auditorNotes)}</div>`:''}</section>`}
-function renderLabDevs(){const body=document.getElementById('labDevRows');if(!body)return;const ds=labDeviations().sort((a,b)=>b.score-a.score);body.innerHTML=ds.length?ds.map(i=>{const a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${esc(i.code)}</td><td>${esc(i.process||'APOYO')}</td><td>${esc(i.domain)}</td><td>${esc(t.deviation)}</td><td>${esc(a.obs||'')}</td><td>${esc(labCriticalityText(i))}</td><td>${esc(labHistoricalText(i))}</td><td>${esc(t.rec)}</td><td>${esc(t.resp)}</td><td>${esc(t.plazo)}</td></tr>`}).join(''):'<tr><td colspan="10">No hay desvíos de Laboratorio cargados.</td></tr>'}
-function renderLabPlan(){const body=document.getElementById('labPlanRows');if(!body)return;const ds=labDeviations().sort((a,b)=>b.score-a.score);body.innerHTML=ds.length?ds.map(i=>{const a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${esc(i.code)}</td><td>${esc(i.process||'APOYO')}</td><td>${esc(t.deviation)}</td><td>${esc(t.rec)}</td><td>${esc(t.ev)}</td><td>${esc(t.resp)}</td><td>${esc(t.plazo)}</td><td><select onchange="setStatus('${i.code}',this.value)">${['PENDIENTE','EN PROCESO','CUMPLIDO','VERIFICADO'].map(x=>`<option ${a.status===x?'selected':''}>${x}</option>`).join('')}</select></td></tr>`}).join(''):'<tr><td colspan="8">No hay desvíos. El plan se genera automáticamente a partir de las respuestas NO.</td></tr>'}
+function renderLabDevs(){const body=document.getElementById('labDevRows');if(!body)return;const ds=labDeviations().sort((a,b)=>b.score-a.score);body.innerHTML=ds.length?ds.map(i=>{const a=answerFor(i.code),t=finalTechnicalFor(i);return `<tr><td>${esc(i.code)}</td><td>${esc(i.process||'APOYO')}</td><td>${esc(i.domain)}</td><td>${esc(t.deviation)}</td><td>${esc(a.obs||'')}</td><td>${esc(labCriticalityText(i))}</td><td>${esc(labHistoricalText(i))}</td><td>${esc(t.rec)}</td><td>${esc(t.resp)}</td><td>${esc(t.plazo)}</td></tr>`}).join(''):'<tr><td colspan="10">No hay desvíos de Laboratorio cargados.</td></tr>'}
+function renderLabPlan(){const body=document.getElementById('labPlanRows');if(!body)return;const ds=labDeviations().sort((a,b)=>b.score-a.score);body.innerHTML=ds.length?ds.map(i=>{const a=answerFor(i.code),t=finalTechnicalFor(i);return `<tr><td>${esc(i.code)}</td><td>${esc(i.process||'APOYO')}</td><td>${esc(t.deviation)}</td><td>${esc(t.rec)}</td><td>${esc(t.ev)}</td><td>${esc(t.resp)}</td><td>${esc(t.plazo)}</td><td><select onchange="setStatus('${i.code}',this.value)">${['PENDIENTE','EN PROCESO','CUMPLIDO','VERIFICADO'].map(x=>`<option ${a.status===x?'selected':''}>${x}</option>`).join('')}</select></td></tr>`}).join(''):'<tr><td colspan="8">No hay desvíos. El plan se genera automáticamente a partir de las respuestas NO.</td></tr>'}
 function labProcessMetrics(process){const arr=labItems().filter(i=>(i.process||'APOYO')===process),evals=arr.filter(i=>['SI','NO'].includes(answerFor(i.code).response)),devs=evals.filter(i=>answerFor(i.code).response==='NO'),yes=evals.filter(i=>answerFor(i.code).response==='SI').length,idx=iirsForItems(arr,answerFor);return {process,evaluated:evals.length,deviations:devs.length,high:devs.filter(i=>i.score>=4).length,compliance:evals.length?yes/evals.length:0,index:idx}}
 function labExecutiveText(){const s=labStats(),idx=labIIRS(),ds=labDeviations();if(!s.evaluated)return 'Laboratorio todavía no cuenta con requisitos evaluados suficientes para emitir un resumen.';const processes=['PREANALÍTICO','ANALÍTICO','POSTANALÍTICO','APOYO'].map(labProcessMetrics).filter(x=>x.evaluated);const affected=processes.filter(x=>x.deviations).sort((a,b)=>b.index.value-a.index.value).map(x=>x.process);return `La auditoría del Área Laboratorio evaluó ${s.evaluated} requisitos, con un cumplimiento del ${(s.compliance*100).toFixed(1).replace('.',',')} %. Se identificaron ${s.dev} desvíos, de los cuales ${s.high} son altos o críticos. El IIRS del área es ${idx.value==null?'sin datos':idx.value.toFixed(2)}${idx.band?` (${idx.band.label})`:''}.${affected.length?` Los procesos con desvíos se concentran en ${affected.join(', ')}.`:''}`}
-function labActSummary(){const ds=labDeviations().sort((a,b)=>b.score-a.score);if(!ds.length)return 'No se registran desvíos de Laboratorio conforme a las respuestas cargadas.';return ds.map(i=>`${i.code}: ${technicalFor(i).deviation}${answerFor(i.code).obs?' Observación: '+answerFor(i.code).obs:''}`).join(' ')}
+function labActSummary(){const ds=labDeviations().sort((a,b)=>b.score-a.score);if(!ds.length)return 'No se registran desvíos de Laboratorio conforme a las respuestas cargadas.';return ds.map(i=>`${i.code}: ${finalTechnicalFor(i).deviation}${answerFor(i.code).obs?' Observación: '+answerFor(i.code).obs:''}`).join(' ')}
 function renderLabSummary(){const s=labStats(),idx=labIIRS();const k=document.getElementById('labSummaryKpis');if(k)k.innerHTML=[['Evaluados',s.evaluated],['Desvíos',s.dev],['Altos/críticos',s.high],['Cumplimiento',(s.compliance*100).toFixed(1)+'%'],['IIRS',idx.value==null?'—':idx.value.toFixed(2)]].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');const e=document.getElementById('labExecText');if(e)e.textContent=labExecutiveText();const a=document.getElementById('labActText');if(a)a.textContent=labActSummary();const body=document.getElementById('labProcessRows');if(body)body.innerHTML=['PREANALÍTICO','ANALÍTICO','POSTANALÍTICO','APOYO'].map(labProcessMetrics).filter(x=>x.evaluated).map(x=>`<tr><td>${x.process}</td><td>${x.evaluated}</td><td>${x.deviations}</td><td>${x.high}</td><td>${(x.compliance*100).toFixed(1)}%</td><td>${iirsBadge(x.index)}</td></tr>`).join('')||'<tr><td colspan="6">Sin datos suficientes.</td></tr>'}
 function renderLabNorms(){const body=document.getElementById('labNormRows');if(!body)return;body.innerHTML=NORMS.filter(n=>n.service==='Laboratorio').map(n=>`<tr><td>${esc(n.scope)}</td><td>${esc(n.number)}</td><td>${esc(n.regulation)}</td><td>${esc(n.authority)}</td><td>${esc(n.status)}</td></tr>`).join('')}
 function labScheduleText(schedule){return LAB_DAYS.map(([k,l])=>schedule?.[k]?`${l}: ${schedule[k]}`:'').filter(Boolean).join(' · ')||'No informado'}
 function labProfileReportBlock(){const p=state.labProfile||defaultLabProfile(),eq=Object.entries(p.equipment||{}).filter(([,v])=>Number(v.qty)>0||String(v.obs||'').trim());return `<section class="report-section"><h1>2. CARACTERIZACIÓN DEL SERVICIO</h1><table class="report-meta"><tr><th>Dirección Técnica</th><td>${esc(p.directorName||'No informado')}</td><th>Matrícula</th><td>${esc(p.directorLicense||'No informada')}</td></tr><tr><th>Especialidad</th><td>${esc(p.directorSpecialty||'No informada')}</td><th>Modalidad</th><td>${esc(p.ownership||'No informada')} / ${esc(p.locationType||'')}</td></tr><tr><th>Bioquímicos</th><td>${Number(p.biochemists||0)}</td><th>Técnicos</th><td>${Number(p.technicians||0)}</td></tr><tr><th>Administrativos</th><td>${Number(p.administrative||0)}</td><th>Limpieza</th><td>${Number(p.cleaningStaff||0)}</td></tr><tr><th>Pacientes/día</th><td>${Number(p.avgPatients||0)}</td><th>Informes</th><td>${p.reportPaper?'Papel ':''}${p.reportElectronic?'Electrónico':''}</td></tr><tr><th>Guardia</th><td>${esc(p.guardType||'No informada')}</td><th>Cobertura</th><td>${esc(p.guardBiochemist||'No informada')}</td></tr><tr><th>Horario bioquímicos</th><td colspan="3">${esc(labScheduleText(p.biochemSchedule))}</td></tr><tr><th>Funcionamiento</th><td colspan="3">${esc(labScheduleText(p.operationSchedule))}</td></tr></table>${eq.length?`<h2>Equipamiento declarado</h2><table><tr><th>Equipo</th><th>Cantidad</th><th>Observaciones</th></tr>${eq.map(([n,v])=>`<tr><td>${esc(n)}</td><td>${Number(v.qty||0)}</td><td>${esc(v.obs||'')}</td></tr>`).join('')}</table>`:''}${p.otherEquipment?`<p><b>Otros equipos:</b> ${esc(p.otherEquipment)}</p>`:''}</section>`}
-function labTechnicalAnnex(){const ds=labDeviations().sort((a,b)=>b.score-a.score);if(!ds.length)return '<p>No se registraron desvíos de Laboratorio.</p>';return ds.map(i=>{const t=technicalFor(i),a=answerFor(i.code);return `<div class="deviation-block"><h4>${esc(i.code)} · ${esc(t.deviation)}</h4><p><b>Proceso:</b> ${esc(i.process||'APOYO')} · <b>Dominio:</b> ${esc(i.domain)}</p>${a.obs?`<p><b>Observación y evidencia:</b> ${esc(a.obs)}</p>`:''}<p><b>Fundamentación técnica:</b> ${esc(t.why)}</p><p><b>Criticidad:</b> ${esc(labCriticalityText(i))} · Riesgo SIAPE ${i.score}/5</p>${i.historicalFrequency!=null?`<p><b>Antecedente auditorías 2025:</b> ${esc(labHistoricalText(i))}. La frecuencia histórica se utiliza como contexto y no modifica automáticamente el IIRS actual.</p>`:''}<p><b>Recomendación:</b> ${esc(t.rec)}</p><p><b>Evidencia esperada:</b> ${esc(t.ev)}</p><p><b>Responsable:</b> ${esc(t.resp)}</p><p><b>Plazo:</b> ${esc(t.plazo)}</p></div>`}).join('')}
+function labTechnicalAnnex(){const ds=labDeviations().sort((a,b)=>b.score-a.score);if(!ds.length)return '<p>No se registraron desvíos de Laboratorio.</p>';return ds.map(i=>{const t=finalTechnicalFor(i),a=answerFor(i.code);return `<div class="deviation-block"><h4>${esc(i.code)} · ${esc(t.deviation)}</h4><p><b>Proceso:</b> ${esc(i.process||'APOYO')} · <b>Dominio:</b> ${esc(i.domain)}</p>${a.obs?`<p><b>Observación y evidencia:</b> ${esc(a.obs)}</p>`:''}${t.why?`<p><b>Fundamentación técnica:</b> ${esc(t.why)}</p>`:''}<p><b>Criticidad:</b> ${esc(labCriticalityText(i))} · Riesgo SIAPE ${i.score}/5</p>${i.historicalFrequency!=null?`<p><b>Antecedente auditorías 2025:</b> ${esc(labHistoricalText(i))}. La frecuencia histórica se utiliza como contexto y no modifica automáticamente el IIRS actual.</p>`:''}${t.rec?`<p><b>Recomendación:</b> ${esc(t.rec)}</p>`:''}${t.ev?`<p><b>Evidencia esperada:</b> ${esc(t.ev)}</p>`:''}${t.resp?`<p><b>Responsable:</b> ${esc(t.resp)}</p>`:''}${t.plazo?`<p><b>Plazo:</b> ${esc(t.plazo)}</p>`:''}</div>`}).join('')}
 function labProcessReportTable(){const rows=['PREANALÍTICO','ANALÍTICO','POSTANALÍTICO','APOYO'].map(labProcessMetrics).filter(x=>x.evaluated);return rows.length?`<table><tr><th>Proceso</th><th>Evaluados</th><th>Desvíos</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS</th></tr>${rows.map(x=>`<tr><td>${x.process}</td><td>${x.evaluated}</td><td>${x.deviations}</td><td>${x.high}</td><td>${(x.compliance*100).toFixed(1)}%</td><td>${x.index.value==null?'—':x.index.value.toFixed(2)}</td></tr>`).join('')}</table>`:'<p>Sin datos por proceso.</p>'}
-function renderLabReport(){const s=labStats(),idx=labIIRS(),meta=state.meta;const norms=NORMS.filter(n=>n.service==='Laboratorio');const host=document.getElementById('labReportContent');if(!host)return;host.innerHTML=`<div class="report"><section class="cover"><h1>INFORME EJECUTIVO N° ${esc(reportId())}</h1><h2>AUDITORÍA PRESTACIONAL · LABORATORIO</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||'PRESTADOR')}</div></section><section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(reportId())}</td><th>Fecha</th><td>${esc(meta.date||'')}</td></tr><tr><th>Prestador</th><td>${esc(meta.prestador||'')}</td><th>CUIT</th><td>${esc(meta.cuit||'')}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address||'')}</td><th>Jurisdicción</th><td>${esc(meta.province||'')}</td></tr><tr><th>Nivel</th><td>${esc(meta.level||'')}</td><th>Auditor</th><td>${esc(meta.auditor||'')}</td></tr></table></section>${labProfileReportBlock()}<section class="report-section"><h1>3. RESUMEN EJECUTIVO</h1><p>${esc(labExecutiveText())}</p><table><tr><th>Requisitos aplicables</th><th>Evaluados</th><th>Desvíos</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS</th></tr><tr><td>${s.active}</td><td>${s.evaluated}</td><td>${s.dev}</td><td>${s.high}</td><td>${(s.compliance*100).toFixed(1)}%</td><td>${idx.value==null?'—':idx.value.toFixed(2)}</td></tr></table><h2>Análisis por proceso</h2>${labProcessReportTable()}</section><section class="report-section"><h1>4. OBJETO Y ALCANCE</h1><p>Verificar la estructura, recursos humanos, funcionalidad, capacidad resolutiva, fases preanalítica, analítica y postanalítica, aseguramiento de la calidad, trazabilidad, equipamiento, mantenimiento y bioseguridad del Laboratorio conforme a la guía y evidencia disponible durante la auditoría.</p></section>${labInterviewReportBlock()}<section class="report-section"><h1>6. SÍNTESIS PARA EL ACTA</h1><div class="summary-text">${esc(labActSummary())}</div></section><section class="report-section"><h1>7. REFERENCIAS TÉCNICAS</h1>${norms.map(n=>`<h3>${esc(n.number)}</h3><p>${esc(n.regulation)} · ${esc(n.status)}</p>`).join('')}<p class="small">Las referencias deben validarse documentalmente antes de utilizarse como fundamento legal directo.</p></section><section class="report-section"><h1>8. ANEXO TÉCNICO OPERATIVO - DESVÍOS DE LABORATORIO</h1>${labTechnicalAnnex()}</section><div class="signature">Firma del auditor</div></div>`}
+function renderLabReport(){const s=labStats(),idx=labIIRS(),meta=state.meta;const norms=NORMS.filter(n=>n.service==='Laboratorio');const host=document.getElementById('labReportContent');if(!host)return;host.innerHTML=`<div class="report"><section class="cover"><h1>INFORME EJECUTIVO N° ${esc(reportId())}</h1><h2>AUDITORÍA PRESTACIONAL · LABORATORIO</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||'PRESTADOR')}</div></section><section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(reportId())}</td><th>Fecha</th><td>${esc(meta.date||'')}</td></tr><tr><th>Prestador</th><td>${esc(meta.prestador||'')}</td><th>CUIT</th><td>${esc(meta.cuit||'')}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address||'')}</td><th>Jurisdicción</th><td>${esc(meta.province||'')}</td></tr><tr><th>Nivel</th><td>${esc(meta.level||'')}</td><th>Auditor</th><td>${esc(meta.auditor||'')}</td></tr></table></section>${labProfileReportBlock()}<section class="report-section"><h1>3. RESUMEN EJECUTIVO</h1><p>${esc(labExecutiveText())}</p><table><tr><th>Requisitos aplicables</th><th>Evaluados</th><th>Desvíos</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS</th></tr><tr><td>${s.active}</td><td>${s.evaluated}</td><td>${s.dev}</td><td>${s.high}</td><td>${(s.compliance*100).toFixed(1)}%</td><td>${idx.value==null?'—':idx.value.toFixed(2)}</td></tr></table><h2>Análisis por proceso</h2>${labProcessReportTable()}</section>${labRiskReportBlock()}<section class="report-section"><h1>4. OBJETO Y ALCANCE</h1><p>Verificar la estructura, recursos humanos, funcionalidad, capacidad resolutiva, fases preanalítica, analítica y postanalítica, aseguramiento de la calidad, trazabilidad, equipamiento, mantenimiento y bioseguridad del Laboratorio conforme a la guía y evidencia disponible durante la auditoría.</p></section>${labInterviewReportBlock()}<section class="report-section"><h1>6. SÍNTESIS PARA EL ACTA</h1><div class="summary-text">${esc(labActSummary())}</div></section><section class="report-section"><h1>7. REFERENCIAS TÉCNICAS</h1>${norms.map(n=>`<h3>${esc(n.number)}</h3><p>${esc(n.regulation)} · ${esc(n.status)}</p>`).join('')}<p class="small">Las referencias deben validarse documentalmente antes de utilizarse como fundamento legal directo.</p></section><section class="report-section"><h1>8. ANEXO TÉCNICO OPERATIVO - DESVÍOS DE LABORATORIO</h1>${labTechnicalAnnex()}</section><div class="signature">Firma del auditor</div></div>`}
 async function prepareLabReportWithPhotos(){renderLabReport();const blocks=[];for(const i of labDeviations()){const ps=await getEvidencePhotos(i.code);if(ps.length)blocks.push(`<section class="report-section photo-report"><h1>EVIDENCIA FOTOGRÁFICA · ${esc(i.code)}</h1><p><b>Laboratorio:</b> ${esc(i.item)}</p><div class="report-photo-grid">${ps.map((p,n)=>`<figure><img src="${URL.createObjectURL(p.blob)}"><figcaption>Fotografía ${n+1} · ${new Date(p.createdAt).toLocaleString()}</figcaption></figure>`).join('')}</div></section>`)}document.getElementById('labReportContent').insertAdjacentHTML('beforeend',blocks.join(''));alert(blocks.length?'Informe de Laboratorio preparado con fotografías.':'No hay fotografías cargadas en los desvíos de Laboratorio.')}
 function labShareText(){const s=labStats(),idx=labIIRS();return `SIAPE · Laboratorio · Informe ${reportId()}\nPrestador: ${state.meta.prestador||'Sin identificar'}\nFecha: ${state.meta.date||''}\nAuditor: ${state.meta.auditor||''}\nDesvíos: ${s.dev}\nIIRS Laboratorio: ${idx.value==null?'Sin datos':idx.value.toFixed(2)}`}
+async function printLabReport(){document.body.classList.add('printing-lab');const clear=()=>document.body.classList.remove('printing-lab');window.addEventListener('afterprint',clear,{once:true});window.print();setTimeout(clear,1500)}
 async function shareLabReport(){const text=labShareText();if(navigator.share){try{await navigator.share({title:`SIAPE · Laboratorio · Informe ${reportId()}`,text});return}catch(e){if(e.name==='AbortError')return}}const action=prompt('Escriba una opción: CORREO, WHATSAPP o CANCELAR','CORREO');if(!action)return;const a=action.toUpperCase();if(a.startsWith('CORREO')){const to=prompt('Correo destinatario:','')||'';location.href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent('SIAPE · Laboratorio · Informe '+reportId())}&body=${encodeURIComponent(text+'\n\nAdjunte el informe generado desde SIAPE.')}`}else if(a.startsWith('WHATS'))window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank')}
 
 function setResp(code,r){state.answers[code]={...answerFor(code),response:r};markDirty();if(String(code).startsWith('LAB-'))renderLabAudit();else renderAudit()}
@@ -772,12 +817,12 @@ function renderSummary(){
 }
 function renderDevs(){
  let ds=deviations().sort((a,b)=>b.score-a.score);
- $("#devRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${i.domain}</td><td>${t.deviation}</td><td>${a.obs||""}</td><td>${t.why}</td><td>${riskLabel(i.score)}</td><td>${t.rec}</td><td>${t.resp}</td><td>${t.plazo}</td><td>${normText(i.service)}</td></tr>`}).join("");
+ $("#devRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=finalTechnicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${i.domain}</td><td>${t.deviation}</td><td>${a.obs||""}</td><td>${t.why}</td><td>${riskLabel(i.score)}</td><td>${t.rec}</td><td>${t.resp}</td><td>${t.plazo}</td><td>${normText(i.service)}</td></tr>`}).join("");
 }
 function renderPlan(){
  let ds=deviations().sort((a,b)=>b.score-a.score);
  const rows=$("#planRows");if(!rows)return;
- rows.innerHTML=ds.length?ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${t.deviation}</td><td>${t.rec}</td><td>${t.ev}</td><td>${t.resp}</td><td>${t.plazo}</td><td><select onchange="setStatus('${i.code}',this.value)">${["PENDIENTE","EN PROCESO","CUMPLIDO","VERIFICADO"].map(x=>`<option ${a.status===x?"selected":""}>${x}</option>`).join("")}</select></td></tr>`}).join(""):'<tr><td colspan="8" class="small">No hay desvíos cargados. El plan de mejora se genera automáticamente a partir de las respuestas NO.</td></tr>';
+ rows.innerHTML=ds.length?ds.map(i=>{let a=answerFor(i.code),t=finalTechnicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${t.deviation}</td><td>${t.rec}</td><td>${t.ev}</td><td>${t.resp}</td><td>${t.plazo}</td><td><select onchange="setStatus('${i.code}',this.value)">${["PENDIENTE","EN PROCESO","CUMPLIDO","VERIFICADO"].map(x=>`<option ${a.status===x?"selected":""}>${x}</option>`).join("")}</select></td></tr>`}).join(""):'<tr><td colspan="8" class="small">No hay desvíos cargados. El plan de mejora se genera automáticamente a partir de las respuestas NO.</td></tr>';
 }
 function setStatus(c,v){state.answers[c]={...answerFor(c),status:v};save()}
 function renderNorms(){
@@ -810,7 +855,7 @@ function conclusionsText(){
   const highlighted=[...serious,...moderate];
   let text=`En ${service} se identificaron ${ds.length} ${ds.length===1?"desvío":"desvíos"} (${countPhrase(c)})`;
   if(topThemes.length)text+=`, principalmente vinculados con ${topThemes.join(", ")}`;
-  if(highlighted.length)text+=`. Entre los hallazgos prioritarios: ${highlighted.map(i=>technicalFor(i).deviation).join(" ")}`;
+  if(highlighted.length)text+=`. Entre los hallazgos prioritarios: ${highlighted.map(i=>finalTechnicalFor(i).deviation).join(" ")}`;
   return text+`.`;
  });
  const impactParts=[];
@@ -835,7 +880,7 @@ function technicalAnnex(){
  if(!affected.length)return '<p>No se registraron desvíos para desarrollar en este anexo.</p>';
  return affected.map((s,idx)=>{
   let ds=deviations().filter(i=>i.service===s).sort((a,b)=>b.score-a.score);
-  return `<h3 class="area-heading">8.${idx+1} ${esc(s.toUpperCase())}</h3>`+ds.map(i=>{let t=technicalFor(i),a=answerFor(i.code);return `<div class="deviation-block"><h4>${esc(i.code)} · ${esc(t.deviation)}</h4>${a.obs?`<p><b>Observación y evidencia:</b> ${esc(a.obs)}</p>`:""}<p><b>Fundamentación técnica:</b> ${esc(t.why)}</p><p><b>Riesgo:</b> ${esc(riskLabel(i.score))} — ${esc(i.riskType||"")}. ${esc(i.impact||"")}</p><p><b>Recomendación:</b> ${esc(t.rec)}</p><p><b>Evidencia esperada:</b> ${esc(t.ev)}</p><p><b>Responsable:</b> ${esc(t.resp)}</p><p><b>Plazo:</b> ${esc(t.plazo)}</p><p><b>Marco normativo:</b> ${esc(normText(i.service))}</p></div>`}).join("");
+  return `<h3 class="area-heading">8.${idx+1} ${esc(s.toUpperCase())}</h3>`+ds.map(i=>{let t=finalTechnicalFor(i),a=answerFor(i.code);return `<div class="deviation-block"><h4>${esc(i.code)} · ${esc(t.deviation)}</h4>${a.obs?`<p><b>Observación y evidencia:</b> ${esc(a.obs)}</p>`:""}<p><b>Fundamentación técnica:</b> ${esc(t.why)}</p><p><b>Riesgo:</b> ${esc(riskLabel(i.score))} — ${esc(i.riskType||"")}. ${esc(i.impact||"")}</p>${t.rec?`<p><b>Recomendación:</b> ${esc(t.rec)}</p>`:''}${t.ev?`<p><b>Evidencia esperada:</b> ${esc(t.ev)}</p>`:''}${t.resp?`<p><b>Responsable:</b> ${esc(t.resp)}</p>`:''}${t.plazo?`<p><b>Plazo:</b> ${esc(t.plazo)}</p>`:''}<p><b>Marco normativo:</b> ${esc(normText(i.service))}</p></div>`}).join("");
  }).join("");
 }
 function normalizeSearch(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim()}
@@ -866,37 +911,84 @@ function rhReportBlock(){
  const r=state.rh?.result;if(!r?.calculated)return "";
  return `<h2>Evaluación de Recursos Humanos de Enfermería</h2><table><tr><th>Servicio</th><th>Turno</th><th>Método</th><th>Requerido</th><th>Disponible efectivo</th><th>Déficit</th><th>Cobertura</th><th>Riesgo</th></tr><tr><td>${esc(state.rh.service)}</td><td>${esc(state.rh.shift)}</td><td>${esc(state.rh.method)}</td><td>${r.required.toFixed(1)}</td><td>${r.available.toFixed(1)}</td><td>${r.deficit.toFixed(1)}</td><td>${r.coverage.toFixed(1)}%</td><td>${esc(r.riskLabel)}</td></tr></table><p>${esc(r.interpretation)}</p><p class="small"><b>Criterio consignado:</b> ${esc(state.rh.normRef||"No informado")} · ${esc(r.usedText)}</p>`;
 }
-function renderReport(){
- let s=stats(), audited=selectedServices(), bullets=executiveBullets();
- const meta={
-   reportNumber:state.meta.reportNumber||'',
-   reportYear:state.meta.reportYear||String(new Date().getFullYear()),
-   prestador:state.meta.prestador||'',
-   cuit:state.meta.cuit||'',
-   province:state.meta.province||'',
-   level:state.meta.level||'',
-   type:state.meta.type||'',
-   date:state.meta.date||'',
-   auditor:state.meta.auditor||currentSessionUser?.displayName||'',
-   address:state.meta.address||''
- };
- const localReportId=()=>`${meta.reportNumber||'S/N'}/${meta.reportYear||new Date().getFullYear()}`;
- const active=s.active, answered=s.answered, dev=s.dev, mod=s.mod, high=s.high;
- const compliance=s.compliance||0;
- const iirs=currentIIRS().value||0;
- $("#reportContent").innerHTML=`<div class="report">
- <section class="cover"><h1>INFORME EJECUTIVO N° ${esc(localReportId())}</h1><h2>AUDITORÍA INTEGRAL PRESTACIONAL</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||"PRESTADOR")}</div></section>
- <section><h1>ÍNDICE</h1><div class="index-list">1. Datos del prestador y de la auditoría<br>2. Resumen ejecutivo<br>3. Objeto de la auditoría<br>4. Alcance<br>5. Panel general y análisis de riesgo<br>6. Conclusiones<br>7. Anexo técnico legal<br>8. Anexo técnico operativo - Desvíos por área y proceso</div></section>
- <section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(localReportId())}</td><th>Fecha</th><td>${esc(meta.date)}</td></tr><tr><th>Institución</th><td>${esc(meta.prestador)}</td><th>CUIT</th><td>${esc(meta.cuit)}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address)}</td><th>Jurisdicción</th><td>${esc(meta.province)}</td></tr><tr><th>Nivel</th><td>${esc(meta.level)}</td><th>Tipo</th><td>${esc(meta.type)}</td></tr><tr><th>Auditor</th><td colspan="3">${esc(meta.auditor)}</td></tr><tr><th>Áreas auditadas</th><td colspan="3">${esc(audited.join(", "))}</td></tr></table></section>
- <section class="report-section"><h1>2. RESUMEN EJECUTIVO</h1><p>${esc(executive())}</p>${bullets.length?`<p>En tal sentido se verificó:</p><ul class="red-list">${bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}<p>La evaluación consolidada comprende ${active} requisitos aplicables. Se registraron ${dev} desvíos, de los cuales ${high} son altos o críticos y ${mod} moderados. El detalle se encuentra en los anexos técnicos por área.</p></section>
- <section class="report-section"><h1>3. OBJETO DE LA AUDITORÍA</h1><p>El objeto de la presente auditoría es verificar el cumplimiento del proceso prestacional en las áreas seleccionadas, conforme al vínculo prestacional con el INSSJP, evaluando aspectos legales, organizativos, técnicos y de calidad de la traza de atención y de los procesos de apoyo auditados.</p></section>
- <section class="report-section"><h1>4. ALCANCE</h1><p>Análisis del proceso prestacional mediante el relevamiento de las siguientes áreas: <b>${esc(audited.join(", "))}</b>.</p><p>Para llevar adelante la tarea precitada:</p><ul>${scopeText()}</ul><p>El alcance se limita a las áreas seleccionadas y a la evidencia efectivamente disponible y observada durante el relevamiento.</p></section>
- ${interviewReportBlock()}<section class="report-section"><h1>5. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS consolidado (0–5)</th></tr><tr><td>${active}</td><td>${answered}</td><td>${dev}</td><td>${mod}</td><td>${high}</td><td>${(compliance*100).toFixed(1)}%</td><td>${Number(iirs).toFixed(2)}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}</div></section>
- <section class="report-section"><h1>6. CONCLUSIONES</h1><p>${esc(conclusionsText())}</p></section>
- <section class="report-section"><h1>7. ANEXO TÉCNICO LEGAL</h1>${legalAnnex()}<p class="small">Las referencias normativas deben validarse según jurisdicción, nivel, tipo de establecimiento y requisito concreto antes de citar artículos específicos.</p></section>
- <section class="report-section"><h1>8. ANEXO TÉCNICO OPERATIVO - DESVÍOS POR ÁREA Y PROCESO</h1>${technicalAnnex()}</section>
- <div class="signature">Firma del auditor</div></div>`;
+function integralAreaItems(service){
+ if(service==='Laboratorio')return labItems();
+ return activeItems().filter(i=>i.service===service);
 }
+function integralAreaMetrics(service){
+ const items=integralAreaItems(service),evaluated=items.filter(i=>['SI','NO'].includes(answerFor(i.code).response)),devs=evaluated.filter(i=>answerFor(i.code).response==='NO'),yes=evaluated.filter(i=>answerFor(i.code).response==='SI').length;
+ return {items,evaluated,devs,yes,compliance:evaluated.length?yes/evaluated.length:0};
+}
+function integralAreaIsEvaluated(service){return integralAreaMetrics(service).evaluated.length>0}
+function integralEvaluatedAreas(){return ['Enfermería','Esterilización','Hemodinamia','Limpieza','Lavadero','Laboratorio'].filter(integralAreaIsEvaluated)}
+function areaConclusionSuggestion(service){
+ const m=integralAreaMetrics(service),c=severityCounts(m.devs),pct=(m.compliance*100).toFixed(1).replace('.',',');
+ if(!m.evaluated.length)return `El área ${service} no registra requisitos efectivamente evaluados en la auditoría actual.`;
+ if(!m.devs.length)return `En ${service} se evaluaron ${m.evaluated.length} requisitos, sin registrarse desvíos en los ítems efectivamente relevados. El cumplimiento observado fue del ${pct} %. Se recomienda mantener los controles, registros y mecanismos de supervisión que respaldan las condiciones verificadas durante la auditoría.`;
+ const themes={};m.devs.forEach(i=>{const k=plain(i.theme||i.domain||i.process||'proceso evaluado');themes[k]=(themes[k]||0)+1});
+ const top=Object.entries(themes).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>k.toLowerCase());
+ const level=c.grave?'alto':c.moderate?'moderado':'bajo';
+ return `En ${service} se evaluaron ${m.evaluated.length} requisitos y se detectaron ${m.devs.length} ${m.devs.length===1?'desvío':'desvíos'} (${countPhrase(c)}), con un cumplimiento del ${pct} %. Los hallazgos se concentraron principalmente en ${top.length?top.join(' y '):'los procesos evaluados'}. La criticidad global del área se considera de nivel ${level}. Corresponde priorizar la regularización de los hallazgos de mayor impacto y verificar su cierre mediante evidencia objetiva.`;
+}
+function finalAreaConclusion(service){
+ const own=String(state.areaConclusions?.[service]??'').trim();
+ return own||areaConclusionSuggestion(service);
+}
+function setAreaConclusion(service,value){state.areaConclusions=state.areaConclusions||{};state.areaConclusions[service]=value;markDirty();const el=document.getElementById('integralConclusion-'+service.replace(/[^a-z0-9]/gi,''));if(el)el.textContent=value.trim()||areaConclusionSuggestion(service)}
+function restoreAreaConclusion(service){state.areaConclusions=state.areaConclusions||{};delete state.areaConclusions[service];markDirty();renderReport()}
+function renderIntegralConclusionEditors(){
+ const host=document.getElementById('integralConclusionEditors');if(!host)return;
+ const areas=integralEvaluatedAreas();
+ host.innerHTML=areas.length?areas.map(service=>`<div class="integral-conclusion-editor"><label><b>${esc(service)}</b> · Conclusión final del auditor (máximo 10 renglones)</label><textarea rows="6" maxlength="700" oninput="setAreaConclusion('${service}',this.value)">${esc(finalAreaConclusion(service))}</textarea><div class="small">SIAPE propone una síntesis breve. El auditor puede reemplazarla completamente. Se limita a 700 caracteres para mantener una conclusión ejecutiva.</div><button class="secondary" type="button" onclick="restoreAreaConclusion('${service}')">Restaurar sugerencia SIAPE</button></div>`).join(''):'<div class="notice">Todavía no hay áreas con requisitos efectivamente evaluados.</div>';
+}
+function integralNursingInterviewHasContent(){const x=state.interview||{};return ['place','interviewees','auditors','summary','documents','commitments','additional','auditorNotes'].some(k=>String(x[k]||'').trim())}
+function compactInterviewBlock(kind){
+ const x=kind==='lab'?state.labInterview:state.interview;
+ const has=kind==='lab'?labInterviewHasContent():integralNursingInterviewHasContent();
+ const title=kind==='lab'?'Entrevista y notas de Laboratorio':'Entrevista y notas del Área Enfermería';
+ if(!has)return `<h3>${title}</h3><p>No se consignaron entrevistas o notas adicionales para esta área.</p>`;
+ const rows=[];
+ if(x.interviewees)rows.push(`<p><b>Personas entrevistadas:</b> ${esc(x.interviewees)}</p>`);
+ if(x.summary)rows.push(`<p><b>Síntesis:</b> ${esc(x.summary)}</p>`);
+ if(x.documents)rows.push(`<p><b>Documentación/evidencia:</b> ${esc(x.documents)}</p>`);
+ if(x.commitments)rows.push(`<p><b>Compromisos:</b> ${esc(x.commitments)}</p>`);
+ if(x.additional)rows.push(`<p><b>Datos adicionales:</b> ${esc(x.additional)}</p>`);
+ if(x.auditorNotes)rows.push(`<p><b>Notas del auditor:</b> ${esc(x.auditorNotes)}</p>`);
+ return `<h3>${title}</h3><div class="interview-report-text">${rows.join('')}</div>`;
+}
+function compactDeviationList(service){
+ const ds=integralAreaMetrics(service).devs.sort((a,b)=>b.score-a.score||a.code.localeCompare(b.code));
+ if(!ds.length)return '<p><b>Desvíos:</b> No se registraron desvíos en los requisitos efectivamente evaluados.</p>';
+ return `<div class="integral-deviations">${ds.map(i=>{const t=finalTechnicalFor(i),a=answerFor(i.code);return `<div class="integral-deviation"><h4>${esc(i.code)} · ${esc(t.deviation||i.item)}</h4>${a.obs?`<p><b>Observación/evidencia:</b> ${esc(a.obs)}</p>`:''}<p><b>Criticidad:</b> ${esc(service==='Laboratorio'?labCriticalityText(i):(i.criticality||riskLabel(i.score)))} · Riesgo SIAPE ${i.score}/5</p></div>`}).join('')}</div>`;
+}
+function integralServiceBlock(service,n){
+ const m=integralAreaMetrics(service),id='integralConclusion-'+service.replace(/[^a-z0-9]/gi,'');
+ return `<section class="report-section integral-area-block"><h2>${n}. ${esc(service.toUpperCase())}</h2>${compactDeviationList(service)}<h3>Conclusión del área</h3><p id="${id}" class="integral-area-conclusion">${esc(finalAreaConclusion(service))}</p></section>`;
+}
+function renderReport(){
+ const meta={reportNumber:state.meta.reportNumber||'',reportYear:state.meta.reportYear||String(new Date().getFullYear()),prestador:state.meta.prestador||'',cuit:state.meta.cuit||'',province:state.meta.province||'',level:state.meta.level||'',type:state.meta.type||'',date:state.meta.date||'',auditor:state.meta.auditor||currentSessionUser?.displayName||'',address:state.meta.address||''};
+ const localReportId=()=>`${meta.reportNumber||'S/N'}/${meta.reportYear||new Date().getFullYear()}`;
+ const areas=integralEvaluatedAreas(),nursingAreas=areas.filter(x=>x!=='Laboratorio'),hasLab=areas.includes('Laboratorio');
+ const nursingInterviewRelevant=nursingAreas.length||integralNursingInterviewHasContent();
+ const labInterviewRelevant=hasLab||labInterviewHasContent();
+ let sectionNum=2,body='';
+ if(nursingInterviewRelevant){
+   body+=`<section class="report-section"><h1>${sectionNum++}. ÁREA ENFERMERÍA</h1><p class="small">Comprende las guías efectivamente evaluadas de Enfermería, Esterilización, Hemodinamia, Limpieza y Lavadero.</p>${compactInterviewBlock('nursing')}</section>`;
+   nursingAreas.forEach((service,idx)=>{body+=integralServiceBlock(service,`${sectionNum-1}.${idx+1}`)});
+ }
+ if(labInterviewRelevant){
+   body+=`<section class="report-section"><h1>${sectionNum++}. LABORATORIO</h1>${compactInterviewBlock('lab')}</section>`;
+   if(hasLab)body+=integralServiceBlock('Laboratorio',`${sectionNum-1}.1`);
+ }
+ if(!body)body='<section class="report-section"><h1>2. ÁREAS AUDITADAS</h1><p>No hay requisitos efectivamente evaluados ni entrevistas cargadas para incorporar al informe.</p></section>';
+ const host=document.getElementById('reportContent');if(!host)return;
+ host.innerHTML=`<div class="report">
+ <section class="cover"><h1>INFORME INTEGRAL N° ${esc(localReportId())}</h1><h2>AUDITORÍA PRESTACIONAL</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||'PRESTADOR')}</div></section>
+ <section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(localReportId())}</td><th>Fecha</th><td>${esc(meta.date)}</td></tr><tr><th>Institución</th><td>${esc(meta.prestador)}</td><th>CUIT</th><td>${esc(meta.cuit)}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address)}</td><th>Jurisdicción</th><td>${esc(meta.province)}</td></tr><tr><th>Nivel</th><td>${esc(meta.level)}</td><th>Tipo</th><td>${esc(meta.type)}</td></tr><tr><th>Auditor</th><td colspan="3">${esc(meta.auditor)}</td></tr><tr><th>Áreas evaluadas</th><td colspan="3">${esc(areas.join(', ')||'Sin áreas efectivamente evaluadas')}</td></tr></table></section>
+ ${body}<div class="signature">Firma del auditor</div></div>`;
+ renderIntegralConclusionEditors();
+}
+
 function renderAll(){
  ensureState();bindMeta();renderSavedAudits();
  // V3.4.12A: las vistas pesadas se calculan solo al abrirlas.
@@ -907,6 +999,7 @@ function renderPageOnDemand(id){
  if(id==='auditPage')renderAudit();
  else if(id==='labPage')renderLabAudit();
  else if(id==='labDataPage')bindLabProfile();
+ else if(id==='labRiskPage')renderLabRisk();
  else if(id==='labInterviewPage')bindLabInterview();
  else if(id==='labDevPage')renderLabDevs();
  else if(id==='labPlanPage')renderLabPlan();
@@ -931,7 +1024,7 @@ function openRHCalculator(){try{const btn=document.getElementById('auditNav');sh
 function copyText(id){navigator.clipboard.writeText($("#"+id).textContent);alert("Texto copiado")}
 function exportJSON(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="SIAPE_Informe_"+(state.meta.reportNumber||"SN")+"_"+(state.meta.reportYear||"SA")+"_"+(state.meta.prestador||"prestador")+".json";a.click()}
 function importJSON(e){let f=e.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);ensureState();save();renderAll();alert("Auditoría importada")}catch{alert("Archivo no válido")}};r.readAsText(f)}
-function resetAudit(){if(confirm("¿Crear una nueva auditoría? La auditoría actual seguirá disponible solo si fue guardada con el botón 💾 o exportada.")){state={meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},answers:{},enabled:Object.fromEntries(allServices.map(x=>[x,true])),interview:defaultInterview(),labProfile:defaultLabProfile(),labInterview:defaultLabInterview(),rh:defaultRH()};save();renderAll()}}
+function resetAudit(){if(confirm("¿Crear una nueva auditoría? La auditoría actual seguirá disponible solo si fue guardada con el botón 💾 o exportada.")){state={meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},answers:{},enabled:Object.fromEntries(allServices.map(x=>[x,true])),interview:defaultInterview(),labProfile:defaultLabProfile(),labInterview:defaultLabInterview(),labRisk:defaultLabRisk(),areaConclusions:{},rh:defaultRH()};save();renderAll()}}
 
 function defaultRH(){return {service:"Internación general",shift:"Mañana",beds:0,occupied:0,normRef:"",method:"mixto",licensed:0,nurses:0,assistants:0,supervisors:0,absence:0,evidence:"",requiredNorm:0,pMin:0,mMin:0,pMod:0,mMod:0,pEsp:0,mEsp:0,pInt:0,mInt:0,productiveMinutes:360,upeTotal:0,upePerWorker:1,result:null}}
 function ensureRH(){state.rh={...defaultRH(),...(state.rh||{})}}
@@ -1011,7 +1104,7 @@ function aiAuditPayload(){
   services:selectedServices(),
   risk:riskOverall(),
   totals:severityCounts(ds),
-  deviations:ds.map(i=>({code:i.code,area:i.service,domain:i.domain,criticality:i.criticality||riskLabel(i.score),score:i.score,requirement:i.item,observation:answerFor(i.code).obs||'',technical:technicalFor(i).deviation})),
+  deviations:ds.map(i=>({code:i.code,area:i.service,domain:i.domain,criticality:i.criticality||riskLabel(i.score),score:i.score,requirement:i.item,observation:answerFor(i.code).obs||'',technical:finalTechnicalFor(i).deviation})),
   current:{executive:executive(),act:actSummary(),conclusion:conclusionsText()}
  };
 }
@@ -1206,7 +1299,7 @@ function localProvidersForMap(){
   const m=snap.state?.meta||{},idx=snapshotIIRS(snap),coords=providerCoordinates(m);
   const areaMetrics=allServices.map(service=>{const x=snapshotIIRS(snap,service);return x.evaluated?{service,evaluated:x.evaluated,deviations:x.deviations,iirs:x.value}:null}).filter(Boolean);
   if(idx.value==null&&!areaMetrics.length)return null;
-  return {id:snap._id,name:m.prestador||'Prestador',province:m.province||'Sin provincia',city:m.address||m.province||'',lat:coords.lat,lng:coords.lng,locationApprox:coords.approx,type:m.type||'Prestador',complexity:`Nivel ${m.level||'—'}`,module:'Auditoría SIAPE',capitas:0,compliance:snapshotCompliance(snap),iirs:idx.value,lastAudit:m.date||String(snap.savedAt||'').slice(0,10)||'—',areas:areaMetrics.map(x=>x.service),areaMetrics,demo:false};
+  return {id:snap._id,name:m.prestador||'Prestador',province:m.province||'Sin provincia',city:m.address||m.province||'',lat:coords.lat,lng:coords.lng,locationApprox:coords.approx,type:m.type||'Prestador',complexity:`Nivel ${m.level||'—'}`,module:'Auditoría SIAPE',capitas:0,compliance:snapshotCompliance(snap),iirs:idx.value,lastAudit:m.date||String(snap.savedAt||'').slice(0,10)||'—',areas:areaMetrics.map(x=>x.service),areaMetrics,labRisk:labRiskSummaryForState(snap.state),demo:false};
  }).filter(Boolean);
 }
 function mapProviderData(){const real=localProvidersForMap();return real.length?real:DEMO_PROVIDERS}
@@ -1240,7 +1333,7 @@ function renderProviderMapMarkers(){
 function showProviderMapDetail(p){
  const compliance=p.compliance===null||p.compliance===undefined?'Sin datos':`${p.compliance.toFixed(1)}%`,iirs=p.iirs===null||p.iirs===undefined?'Sin auditoría':p.iirs.toFixed(2);
  const metrics=(p.areaMetrics||[]).length?`<table><thead><tr><th>Área</th><th>Evaluados</th><th>Desvíos</th><th>IIRS</th></tr></thead><tbody>${p.areaMetrics.map(x=>`<tr><td>${esc(x.service)}</td><td>${x.evaluated}</td><td>${x.deviations}</td><td>${x.iirs==null?'—':x.iirs.toFixed(2)}</td></tr>`).join('')}</tbody></table>`:`<p>${p.areas.length?p.areas.map(esc).join(' · '):'Todavía no registra áreas evaluadas.'}</p>`;
- document.getElementById('providerMapDetail').innerHTML=`<div class="map-risk-chip map-risk-${providerRiskKey(p)}">${providerRiskLabel(p)}</div><h2>${esc(p.name)}</h2><p><b>${esc(p.city||p.province)}, ${esc(p.province)}</b></p>${p.locationApprox?'<div class="notice"><b>Ubicación aproximada.</b> La auditoría no contiene coordenadas; el punto se representa dentro de la provincia declarada.</div>':''}<dl class="provider-detail-list"><div><dt>Tipo</dt><dd>${esc(p.type)}</dd></div><div><dt>Complejidad</dt><dd>${esc(p.complexity)}</dd></div><div><dt>Fuente</dt><dd>${p.demo?'Demostración':'Auditoría SIAPE guardada'}</dd></div><div><dt>Cumplimiento</dt><dd>${compliance}</dd></div><div><dt>IIRS</dt><dd>${iirs}</dd></div><div><dt>Última auditoría</dt><dd>${esc(p.lastAudit)}</dd></div></dl><h3>Resultados por área</h3>${metrics}`;
+ document.getElementById('providerMapDetail').innerHTML=`<div class="map-risk-chip map-risk-${providerRiskKey(p)}">${providerRiskLabel(p)}</div><h2>${esc(p.name)}</h2><p><b>${esc(p.city||p.province)}, ${esc(p.province)}</b></p>${p.locationApprox?'<div class="notice"><b>Ubicación aproximada.</b> La auditoría no contiene coordenadas; el punto se representa dentro de la provincia declarada.</div>':''}<dl class="provider-detail-list"><div><dt>Tipo</dt><dd>${esc(p.type)}</dd></div><div><dt>Complejidad</dt><dd>${esc(p.complexity)}</dd></div><div><dt>Fuente</dt><dd>${p.demo?'Demostración':'Auditoría SIAPE guardada'}</dd></div><div><dt>Cumplimiento</dt><dd>${compliance}</dd></div><div><dt>IIRS</dt><dd>${iirs}</dd></div><div><dt>Última auditoría</dt><dd>${esc(p.lastAudit)}</dd></div></dl><h3>Resultados por área</h3>${metrics}${labRiskMapSummaryHtml(p.labRisk)}`;
 }
 function resetProviderMapFilters(){['providerMapSearch','providerMapProvince','providerMapComplexity','providerMapRisk'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});renderProviderMap();if(providerMapInstance)providerMapInstance.setView([-38.4,-63.6],4);document.getElementById('providerMapDetail').innerHTML='<h2>Información del prestador</h2><p class="small">Seleccione un punto del mapa para consultar sus datos.</p>'}
 
@@ -1262,8 +1355,8 @@ let followupDemoState=JSON.parse(localStorage.getItem('sigap_followup_demo')||'n
 const FOLLOWUP_LIVE_KEY='sigap_followup_live_status_v1';
 function saveFollowupDemo(){localStorage.setItem('sigap_followup_demo',JSON.stringify(followupDemoState))}
 function currentAuditFollowupCase(){
- const nursing=deviations().map(i=>{const t=technicalFor(i);return {id:i.code,area:i.service||'Enfermería',service:i.service||'Enfermería',risk:i.score||3,deviation:t.deviation,recommendation:t.rec,evidence:t.ev,deadline:t.plazo||'A definir',status:'pendiente',followupNote:'',source:'general'}});
- const laboratory=labDeviations().map(i=>{const t=technicalFor(i);return {id:i.code,area:'Laboratorio',service:'Laboratorio',risk:i.score||3,deviation:t.deviation,recommendation:t.rec,evidence:t.ev,deadline:t.plazo||'A definir',status:'pendiente',followupNote:'',source:'laboratorio'}});
+ const nursing=deviations().map(i=>{const t=finalTechnicalFor(i);return {id:i.code,area:i.service||'Enfermería',service:i.service||'Enfermería',risk:i.score||3,deviation:t.deviation,recommendation:t.rec,evidence:t.ev,deadline:t.plazo||'A definir',status:'pendiente',followupNote:'',source:'general'}});
+ const laboratory=labDeviations().map(i=>{const t=finalTechnicalFor(i);return {id:i.code,area:'Laboratorio',service:'Laboratorio',risk:i.score||3,deviation:t.deviation,recommendation:t.rec,evidence:t.ev,deadline:t.plazo||'A definir',status:'pendiente',followupNote:'',source:'laboratorio'}});
  const all=[...nursing,...laboratory];if(!all.length)return null;
  const saved=JSON.parse(localStorage.getItem(FOLLOWUP_LIVE_KEY)||'{}');
  all.forEach(d=>{const k=`${d.source||'x'}:${d.id}`;if(saved[k])Object.assign(d,saved[k])});
@@ -1427,9 +1520,9 @@ async function deleteEvidencePhoto(id,code){const db=await openPhotoDB();await n
 async function renderPhotoPreview(code){const el=document.getElementById('photo-preview-'+code);if(!el)return;const photos=await getEvidencePhotos(code);el.innerHTML=photos.map(p=>`<div class="photo-thumb"><img src="${URL.createObjectURL(p.blob)}"><button class="danger" onclick="deleteEvidencePhoto('${p.id}','${code}')">×</button></div>`).join('')}
 async function refreshVisiblePhotoCounts(){document.querySelectorAll('[id^="photo-count-"]').forEach(async el=>{const code=el.id.replace('photo-count-',''),ps=await getEvidencePhotos(code);el.textContent=ps.length;renderPhotoPreview(code)})}
 async function openEvidenceGallery(code){const ps=await getEvidencePhotos(code);if(!ps.length)return alert('No hay fotografías asociadas a este desvío.');renderPhotoPreview(code);document.getElementById('photo-preview-'+code)?.scrollIntoView({behavior:'smooth',block:'center'})}
-async function prepareReportWithPhotos(){renderReport();const ds=deviations();const blocks=[];for(const i of ds){const ps=await getEvidencePhotos(i.code);if(ps.length){blocks.push(`<section class="report-section photo-report"><h1>EVIDENCIA FOTOGRÁFICA · ${esc(i.code)}</h1><p><b>${esc(i.service)}:</b> ${esc(i.item)}</p><div class="report-photo-grid">${ps.map((p,n)=>`<figure><img src="${URL.createObjectURL(p.blob)}"><figcaption>Fotografía ${n+1} · ${new Date(p.createdAt).toLocaleString()}</figcaption></figure>`).join('')}</div></section>`)}}document.getElementById('reportContent').insertAdjacentHTML('beforeend',blocks.join(''));alert(blocks.length?'Informe preparado con fotografías.':'No hay fotografías cargadas en los desvíos.')}
+async function prepareReportWithPhotos(){renderReport();const ds=[...deviations(),...labDeviations()];const blocks=[];for(const i of ds){const ps=await getEvidencePhotos(i.code);if(ps.length){blocks.push(`<section class="report-section photo-report"><h1>EVIDENCIA FOTOGRÁFICA · ${esc(i.code)}</h1><p><b>${esc(i.service)}:</b> ${esc(i.item)}</p><div class="report-photo-grid">${ps.map((p,n)=>`<figure><img src="${URL.createObjectURL(p.blob)}"><figcaption>Fotografía ${n+1} · ${new Date(p.createdAt).toLocaleString()}</figcaption></figure>`).join('')}</div></section>`)}}document.getElementById('reportContent').insertAdjacentHTML('beforeend',blocks.join(''));alert(blocks.length?'Informe preparado con fotografías.':'No hay fotografías cargadas en los desvíos.')}
 
-function auditShareText(){return `SIAPE · Informe ${reportId()}\nPrestador: ${state.meta.prestador||'Sin identificar'}\nFecha: ${state.meta.date||''}\nAuditor: ${state.meta.auditor||''}\nDesvíos: ${stats().dev}\nRiesgo: ${riskOverall()}`}
+function auditShareText(){const total=deviations().length+labDeviations().length;return `SIAPE · Informe integral ${reportId()}\nPrestador: ${state.meta.prestador||'Sin identificar'}\nFecha: ${state.meta.date||''}\nAuditor: ${state.meta.auditor||''}\nÁreas evaluadas: ${integralEvaluatedAreas().join(', ')||'Sin datos'}\nDesvíos totales: ${total}`}
 function downloadCurrentHTML(){renderReport();const blob=new Blob([`<!doctype html><meta charset="utf-8"><title>SIAPE ${reportId()}</title><link rel="stylesheet" href="styles.css">${document.getElementById('reportContent').innerHTML}`],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`SIAPE_${reportId().replace('/','_')}.html`;a.click();return blob}
 async function finalizeAndShare(){saveAuditSnapshot();await shareCurrentReport()}
 async function shareCurrentReport(){const text=auditShareText();if(navigator.share){try{await navigator.share({title:`SIAPE · Informe ${reportId()}`,text});return}catch(e){if(e.name==='AbortError')return}}const action=prompt('Escriba una opción: CORREO, WHATSAPP, DESCARGAR o CANCELAR','CORREO');if(!action)return;const a=action.toUpperCase();if(a.startsWith('CORREO')){const to=prompt('Correo destinatario:','')||'';location.href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent('SIAPE · Informe '+reportId())}&body=${encodeURIComponent(text+'\n\nAdjunte el informe generado desde SIAPE.')}`}else if(a.startsWith('WHATS')){window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank')}else if(a.startsWith('DESC'))downloadCurrentHTML()}
