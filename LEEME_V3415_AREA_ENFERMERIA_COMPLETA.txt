@@ -1,0 +1,15 @@
+SIAPE GAP V3.4.15
+
+Corrección de estructura del Área Enfermería:
+- Se restaura la guía completa de Enfermería dentro del Área Enfermería.
+- Se mantienen Esterilización, Lavadero, Limpieza y Hemodinamia dentro de la misma área profesional.
+- Laboratorio continúa fuera de esta versión y se reconstruirá luego como área profesional independiente.
+- Se mantiene la corrección previa del Plan de Mejora.
+
+Estructura actual:
+Área Enfermería
+  • Enfermería
+  • Esterilización
+  • Lavadero
+  • Limpieza
+  • Hemodinamia

@@ -1,0 +1,9 @@
+SIAPE GAP V3.4.14
+
+CAMBIO DE ARQUITECTURA
+- La navegación principal se organiza por profesión/área.
+- La solapa activa es Área Enfermería.
+- Guías visibles actualmente: Esterilización, Lavadero, Limpieza y Hemodinamia.
+- La guía general de Enfermería permanece en la base de datos pero queda reservada/oculta y no participa de cálculos ni informes.
+- Laboratorio no está incorporado. Se agregará más adelante como una solapa profesional independiente con su propia guía.
+- Se actualizó la caché del Service Worker para forzar la nueva versión.

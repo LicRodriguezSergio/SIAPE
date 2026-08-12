@@ -4,7 +4,7 @@ const KEY="siape_profesional_v2_auditoria";
 const LIBKEY="siape_profesional_v2_guardadas";
 let state=JSON.parse(localStorage.getItem(KEY)||"null")||{
  meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},
- answers:{}, enabled:Object.fromEntries(["Enfermería","Esterilización","Hemodinamia","Limpieza","Lavadero"].map(x=>[x,true])),
+ answers:{}, enabled:Object.fromEntries(["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"].map(x=>[x,true])),
  interview:{date:"",time:"",place:"",area:"",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true},
  rh:{service:"Internación general",shift:"Mañana",beds:0,occupied:0,normRef:"",method:"mixto",licensed:0,nurses:0,assistants:0,supervisors:0,absence:0,evidence:"",requiredNorm:0,pMin:0,mMin:0,pMod:0,mMod:0,pEsp:0,mEsp:0,pInt:0,mInt:0,productiveMinutes:360,upeTotal:0,upePerWorker:1,result:null}
 };
@@ -37,7 +37,15 @@ function autoSaveSecurity(){
 setInterval(autoSaveSecurity,10*60*1000);
 function defaultInterview(){return {date:state?.meta?.date||new Date().toISOString().slice(0,10),time:"",place:"",area:"",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true}}
 function ensureState(){
- state.meta=state.meta||{};state.answers=state.answers||{};state.enabled=state.enabled||Object.fromEntries(["Enfermería","Esterilización","Hemodinamia","Limpieza","Lavadero"].map(x=>[x,true]));
+ state.meta=state.meta||{};state.answers=state.answers||{};state.enabled=state.enabled||{};
+ const activeGuides=["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"];
+ activeGuides.forEach(x=>{if(typeof state.enabled[x]!=="boolean")state.enabled[x]=true;});
+ // Migración V3.4.15: la V3.4.14 había deshabilitado Enfermería. Se restaura una sola vez.
+ if(localStorage.getItem("siape_v3415_enfermeria_restored")!=="1"){
+   state.enabled["Enfermería"]=true;
+   localStorage.setItem(KEY,JSON.stringify(state));
+   localStorage.setItem("siape_v3415_enfermeria_restored","1");
+ }
  state.interview={...defaultInterview(),...(state.interview||{})};
  state.rh={...defaultRH(),...(state.rh||{})};
 }
@@ -227,7 +235,7 @@ function rhSyntheticItem(){
  if(!state.enabled["Enfermería"]||!r||!r.calculated)return null;
  return {code:"ENF-RH-001",service:"Enfermería",domain:"Recursos Humanos",theme:"Dotación de Enfermería",levels:"I,II,III,IV",score:r.riskScore,item:`La dotación de personal de enfermería resulta suficiente para ${state.rh.service} en el turno ${state.rh.shift}`,riskType:"Asistencial, organizacional y legal",impact:"La insuficiencia de personal puede comprometer la vigilancia, la continuidad de los cuidados, la administración segura de medicamentos y la respuesta ante eventos críticos.",criticality:r.riskLabel};
 }
-function activeItems(){let a=ITEMS.filter(i=>state.enabled[i.service]&&applicable(i));const rh=rhSyntheticItem();if(rh)a.push(rh);return a}
+function activeItems(){let a=ITEMS.filter(i=>services.includes(i.service)&&state.enabled[i.service]&&applicable(i));return a}
 function deviations(){return activeItems().filter(i=>answerFor(i.code).response==="NO")}
 function stats(){
  const active=activeItems(), answered=active.filter(i=>["SI","NO","NA"].includes(answerFor(i.code).response));
@@ -530,10 +538,16 @@ function interviewText(){const x=state.interview||{},parts=[];
 function interviewReportBlock(){if(!state.interview?.includeInReport||!interviewHasContent())return '';const x=state.interview;return `<section class="report-section"><h1>5. REGISTRO DE ENTREVISTA Y DATOS ADICIONALES</h1><table class="report-meta"><tr><th>Fecha</th><td>${esc(x.date||'')}</td><th>Hora</th><td>${esc(x.time||'')}</td></tr><tr><th>Lugar / modalidad</th><td>${esc(x.place||'')}</td><th>Área o servicio</th><td>${esc(x.area||'')}</td></tr><tr><th>Personas entrevistadas</th><td colspan="3">${esc(x.interviewees||'')}</td></tr><tr><th>Equipo auditor</th><td colspan="3">${esc(x.auditors||'')}</td></tr></table>${x.summary?`<h2>Síntesis de la entrevista</h2><div class="interview-report-text">${esc(x.summary)}</div>`:''}${x.documents?`<h2>Documentación o evidencia mencionada</h2><div class="interview-report-text">${esc(x.documents)}</div>`:''}${x.commitments?`<h2>Compromisos asumidos</h2><div class="interview-report-text">${esc(x.commitments)}</div>`:''}${x.additional?`<h2>Datos adicionales</h2><div class="interview-report-text">${esc(x.additional)}</div>`:''}${x.auditorNotes?`<h2>Observaciones del auditor</h2><div class="interview-report-text">${esc(x.auditorNotes)}</div>`:''}</section>`}
 function copyInterview(){const t=interviewText();if(!t){alert('No hay datos de entrevista para copiar.');return}navigator.clipboard?.writeText(t).then(()=>alert('Registro de entrevista copiado.')).catch(()=>prompt('Copie el registro:',t))}
 function clearInterview(){if(!confirm('¿Limpiar todos los datos de entrevista y comentarios adicionales?'))return;state.interview=defaultInterview();save();bindInterview();renderReport()}
-const services=["Enfermería","Esterilización","Hemodinamia","Limpieza","Lavadero"];
-let currentService="Enfermería";
+// Estructura por profesión: cada solapa profesional define sus propias guías.
+// Para incorporar Laboratorio más adelante, se agregará como una nueva área sin mezclar sus datos con Enfermería.
+const PROFESSIONAL_AREAS={
+ "Área Enfermería":["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"]
+};
+const services=PROFESSIONAL_AREAS["Área Enfermería"];
+let currentService=services[0];
 function renderAudit(){
- $("#serviceTabs").innerHTML=services.map(s=>{const extra=s==="Enfermería"?1:0;return `<button class="service-tab ${s===currentService?"active":""}" onclick="currentService='${s}';renderAudit()">${s} (${ITEMS.filter(i=>i.service===s&&applicable(i)).length+extra})</button>`}).join("");
+ if(!services.includes(currentService))currentService=services[0];
+ $("#serviceTabs").innerHTML=services.map(s=>`<button class="service-tab ${s===currentService?"active":""}" onclick="currentService='${s}';renderAudit()">${s} (${ITEMS.filter(i=>i.service===s&&applicable(i)).length})</button>`).join("");
  let q=($("#search").value||"").toLowerCase(), dom=$("#domainFilter").value;
  let arr=ITEMS.filter(i=>i.service===currentService&&applicable(i)&&(!q||(i.code+" "+i.item+" "+i.domain).toLowerCase().includes(q))&&(!dom||i.domain===dom));
  const domains=[...new Set(ITEMS.filter(i=>i.service===currentService).map(i=>i.domain))];
