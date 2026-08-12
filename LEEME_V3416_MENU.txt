@@ -1,0 +1,8 @@
+SIAPE GAP V3.4.16 — AJUSTE MÍNIMO DE MENÚ
+
+Cambios realizados:
+- La solapa principal de auditoría se muestra como “Área Enfermería”.
+- Se elimina “RRHH Enfermería” de la barra superior para evitar duplicación.
+- El módulo RRHH de Enfermería NO se elimina: permanece accesible dentro de Área Enfermería.
+- Se mantienen las demás solapas y funcionalidades.
+- Se actualiza la caché para forzar la carga del menú corregido.

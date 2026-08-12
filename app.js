@@ -35,7 +35,7 @@ function autoSaveSecurity(){
  }catch(e){console.error(e);showAutoSaveToast('<b>⚠️ No se pudo completar el autoguardado.</b><br>Utilice el botón Guardar.',true);}
 }
 setInterval(autoSaveSecurity,10*60*1000);
-function defaultInterview(){return {date:state?.meta?.date||new Date().toISOString().slice(0,10),time:"",place:"",area:"",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true}}
+function defaultInterview(){return {date:state?.meta?.date||new Date().toISOString().slice(0,10),time:"",place:"",area:"Área Enfermería: Enfermería, Esterilización, Hemodinamia, Limpieza y Lavadero",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true}}
 function ensureState(){
  state.meta=state.meta||{};state.answers=state.answers||{};state.enabled=state.enabled||{};
  const activeGuides=["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"];
@@ -767,7 +767,7 @@ function renderPageOnDemand(id){
 }
 function refreshVisiblePage(){const id=document.querySelector('.page.active')?.id||'startPage';renderPageOnDemand(id);}
 function showPage(id,btn){const page=$("#"+id);if(!page){alert("No se pudo abrir la pantalla solicitada: "+id);return} $$(".page").forEach(x=>x.classList.remove("active"));page.classList.add("active");$$(".navbtn").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");renderPageOnDemand(id);if(id==="aiPage")updateAIConnection();window.scrollTo({top:0,left:0,behavior:"auto"})}
-function openRHCalculator(){try{const btn=Array.from(document.querySelectorAll(".navbtn")).find(b=>/RRHH Enfermer/i.test(b.textContent||""));showPage("rrhhPage",btn||null);setTimeout(()=>{const first=document.querySelector("#rrhhPage [data-rh]");if(first)first.focus({preventScroll:true});window.scrollTo(0,0)},0)}catch(e){console.error(e);alert("No se pudo abrir la calculadora de Recursos Humanos. Detalle: "+e.message)}}
+function openRHCalculator(){try{const btn=document.getElementById('auditNav');showPage("rrhhPage",btn||null);setTimeout(()=>{const first=document.querySelector("#rrhhPage [data-rh]");if(first)first.focus({preventScroll:true});window.scrollTo(0,0)},0)}catch(e){console.error(e);alert("No se pudo abrir la calculadora de Recursos Humanos. Detalle: "+e.message)}}
 function copyText(id){navigator.clipboard.writeText($("#"+id).textContent);alert("Texto copiado")}
 function exportJSON(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="SIAPE_Informe_"+(state.meta.reportNumber||"SN")+"_"+(state.meta.reportYear||"SA")+"_"+(state.meta.prestador||"prestador")+".json";a.click()}
 function importJSON(e){let f=e.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);ensureState();save();renderAll();alert("Auditoría importada")}catch{alert("Archivo no válido")}};r.readAsText(f)}

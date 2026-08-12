@@ -1,0 +1,7 @@
+SIAPE GAP V3.4.17 - ÁREA ENFERMERÍA INTEGRADA
+
+Cambios:
+- El menú superior conserva Área Enfermería como única entrada del flujo profesional de Enfermería.
+- Entrevista y notas, RRHH, Desvíos, Plan de mejora, Resumen y acta, Normativa e Informe PDF se acceden desde Área Enfermería.
+- La entrevista es única para toda el área y puede integrar Enfermería, Esterilización, Hemodinamia, Limpieza y Lavadero.
+- No se eliminaron módulos ni datos; únicamente se reorganizó la navegación.
