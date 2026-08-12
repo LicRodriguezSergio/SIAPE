@@ -1,0 +1,16 @@
+SIAPE GAP V3.4.13 - BASE ESTABLE ENFERMERÍA
+
+Objetivo de esta versión
+- Tomar la V3.4.12B de rescate como base.
+- Retirar por completo el módulo Laboratorio y sus datos para reconstruirlo desde cero más adelante.
+- Conservar el Área Enfermería y sus servicios habilitados.
+- Corregir el acceso al Plan de mejora de Enfermería.
+
+Corrección principal
+La V3.4.12B llamaba a renderPlan() al abrir la pantalla Plan de mejora, pero esa función no estaba definida. En V3.4.13 se creó una función específica para generar el plan a partir de los desvíos (respuestas NO), incluyendo estado de cada acción.
+
+Laboratorio
+Se eliminaron laboratorio.js, laboratorio-data.js, la pantalla, navegación, integración con informes, tablero, seguimiento, perfiles visibles y caché. No se incorporó ninguna guía nueva de Laboratorio en esta versión.
+
+Nota
+Esta versión queda preparada como punto de partida estable para reconstruir Laboratorio posteriormente con una arquitectura separada y validada antes de integrarla al informe general.

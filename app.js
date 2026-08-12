@@ -27,12 +27,10 @@ function showAutoSaveToast(message,done=false){
  if(done)setTimeout(()=>el.classList.remove('show'),2600);
 }
 function autoSaveSecurity(){
- const labDirty=!!window.labDirty;
- if(!siapeDirty&&!labDirty)return;
- showAutoSaveToast('<b>🔄 Autoguardado de seguridad</b><br>Aguarde un instante. SIAPE está guardando la información para proteger el trabajo realizado.');
+ if(!siapeDirty)return;
+ showAutoSaveToast('<b>🔄 Autoguardado de seguridad</b><br>SIAPE está guardando la información para proteger el trabajo realizado.');
  try{
-   if(siapeDirty)persistState();
-   if(typeof window.persistLabState==='function'&&labDirty)window.persistLabState();
+   persistState();
    setTimeout(()=>showAutoSaveToast('<b>✅ Información guardada correctamente</b><br>Puede continuar trabajando.',true),350);
  }catch(e){console.error(e);showAutoSaveToast('<b>⚠️ No se pudo completar el autoguardado.</b><br>Utilice el botón Guardar.',true);}
 }
@@ -588,13 +586,11 @@ function normText(service){
 }
 function renderDashboard(){
  let s=stats(),general=currentIIRS();
- const lm=(typeof window.labAreaMetrics==='function')?window.labAreaMetrics():null;
- const sameProvider=lm&&lm.active>0&&(!state.meta.prestador||!labState?.meta?.prestador||normalizeSearch(state.meta.prestador)===normalizeSearch(labState.meta.prestador));
- const pooledActive=s.active+(sameProvider?lm.active:0), pooledYes=Math.round(s.compliance*s.active)+(sameProvider?lm.yes:0), pooledDev=s.dev+(sameProvider?lm.dev:0);
+ const pooledActive=s.active, pooledYes=Math.round(s.compliance*s.active), pooledDev=s.dev;
  const pooledCompliance=pooledActive?pooledYes/pooledActive:0;
- const pooledIirs=pooledActive?((general.value||0)*s.active+(sameProvider?lm.iirs*lm.active:0))/pooledActive:(general.value||0);
+ const pooledIirs=general.value||0;
  $("#kpis").innerHTML=[
- ["Ítems aplicables",pooledActive],["Respondidos",s.answered+(sameProvider?lm.answered:0)],["Desvíos",pooledDev],["Riesgo alto",s.high+(sameProvider?lm.high:0)],["Cumplimiento",(pooledCompliance*100).toFixed(1)+"%"],["IIRS general",Number(pooledIirs).toFixed(2)]
+  ["Ítems aplicables",pooledActive],["Respondidos",s.answered],["Desvíos",pooledDev],["Riesgo alto",s.high],["Cumplimiento",(pooledCompliance*100).toFixed(1)+"%"],["IIRS general",Number(pooledIirs).toFixed(2)]
  ].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
  $("#overall").innerHTML=`Resultado consolidado del prestador<div class="iirs-overall">IIRS consolidado preliminar: <b>${Number(pooledIirs).toFixed(2)}</b> · Cumplimiento total: <b>${(pooledCompliance*100).toFixed(1)}%</b></div><div class="small">El consolidado pondera todos los requisitos efectivamente aplicables de las áreas cargadas; los NO APLICA no intervienen.</div>`;
  let rows=services.filter(x=>state.enabled[x]).map(sv=>{
@@ -602,7 +598,6 @@ function renderDashboard(){
   let ans=arr.filter(i=>["SI","NO"].includes(answerFor(i.code).response)), yes=ans.filter(i=>answerFor(i.code).response==="SI").length,idx=currentIIRS(sv);
   return `<tr><td>${sv}</td><td>${arr.length}</td><td>${ds.length}</td><td>${ans.length?(yes/ans.length*100).toFixed(1):"0.0"}%</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${iirsBadge(idx)}</td></tr>`
  });
- if(sameProvider)rows.push(`<tr><td><b>Laboratorio</b></td><td>${lm.active}</td><td>${lm.dev}</td><td>${(lm.compliance*100).toFixed(1)}%</td><td>${lm.low}</td><td>${lm.mod}</td><td>${lm.high}</td><td><b>${lm.iirs.toFixed(2)}</b></td></tr>`);
  $("#serviceTable").innerHTML=rows.join("");
  renderProviderRanking();
 }
@@ -612,7 +607,11 @@ function renderSummary(){
 function renderDevs(){
  let ds=deviations().sort((a,b)=>b.score-a.score);
  $("#devRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${i.domain}</td><td>${t.deviation}</td><td>${a.obs||""}</td><td>${t.why}</td><td>${riskLabel(i.score)}</td><td>${t.rec}</td><td>${t.resp}</td><td>${t.plazo}</td><td>${normText(i.service)}</td></tr>`}).join("");
- $("#planRows").innerHTML=ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${t.deviation}</td><td>${t.rec}</td><td>${t.ev}</td><td>${t.resp}</td><td>${t.plazo}</td><td><select onchange="setStatus('${i.code}',this.value)">${["PENDIENTE","EN PROCESO","CUMPLIDO","VERIFICADO"].map(x=>`<option ${a.status===x?"selected":""}>${x}</option>`).join("")}</select></td></tr>`}).join("");
+}
+function renderPlan(){
+ let ds=deviations().sort((a,b)=>b.score-a.score);
+ const rows=$("#planRows");if(!rows)return;
+ rows.innerHTML=ds.length?ds.map(i=>{let a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${i.code}</td><td>${i.service}</td><td>${t.deviation}</td><td>${t.rec}</td><td>${t.ev}</td><td>${t.resp}</td><td>${t.plazo}</td><td><select onchange="setStatus('${i.code}',this.value)">${["PENDIENTE","EN PROCESO","CUMPLIDO","VERIFICADO"].map(x=>`<option ${a.status===x?"selected":""}>${x}</option>`).join("")}</select></td></tr>`}).join(""):'<tr><td colspan="8" class="small">No hay desvíos cargados. El plan de mejora se genera automáticamente a partir de las respuestas NO.</td></tr>';
 }
 function setStatus(c,v){state.answers[c]={...answerFor(c),status:v};save()}
 function renderNorms(){
@@ -693,7 +692,7 @@ function renderSavedAudits(){
  el.innerHTML=arr.map(([id,x])=>{let m=x.state?.meta||{};return `<div class="saved-item"><div><strong>Informe ${esc(m.reportNumber||"S/N")}/${esc(m.reportYear||"")} · ${esc(m.prestador||"Prestador sin identificar")}</strong><div class="small">CUIT: ${esc(m.cuit||"Sin informar")} · Auditoría: ${esc(m.date||"Sin fecha")} · Jurisdicción: ${esc(m.province||"Sin informar")}</div><div class="small">Guardado: ${esc(new Date(x.savedAt).toLocaleString())} · ${Object.keys(x.state?.answers||{}).length} respuestas registradas</div></div><div class="saved-actions"><button class="secondary" onclick="loadAuditSnapshot('${id}')">Abrir / continuar</button><button class="secondary" onclick="shareSavedAudit('${id}')">Compartir</button><button class="danger" onclick="deleteAuditSnapshot('${id}')">Eliminar</button></div></div>`}).join("");
 }
 function saveAuditSnapshot(){
- persistState();if(typeof window.persistLabState==='function'&&window.labDirty)window.persistLabState();refreshVisiblePage();let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");let id=base.toLowerCase();lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits();alert(`Auditoría ${reportId()} guardada en este dispositivo.`)
+ persistState();refreshVisiblePage();let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");let base=`${state.meta.reportNumber||"SN"}_${state.meta.reportYear||"SA"}_${state.meta.prestador||"PRESTADOR"}`.replace(/[^a-z0-9áéíóúüñ_-]+/gi,"_");let id=base.toLowerCase();lib[id]={savedAt:new Date().toISOString(),state:JSON.parse(JSON.stringify(state))};localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits();alert(`Auditoría ${reportId()} guardada en este dispositivo.`)
 }
 function loadAuditSnapshot(id){let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");if(!lib[id])return;state=JSON.parse(JSON.stringify(lib[id].state));ensureState();save();renderAll();alert(`Auditoría ${reportId()} abierta.`)}
 function deleteAuditSnapshot(id){if(!confirm("¿Eliminar esta auditoría guardada del dispositivo?"))return;let lib=JSON.parse(localStorage.getItem(LIBKEY)||"{}");delete lib[id];localStorage.setItem(LIBKEY,JSON.stringify(lib));renderSavedAudits()}
@@ -703,49 +702,33 @@ function rhReportBlock(){
 }
 function renderReport(){
  let s=stats(), audited=selectedServices(), bullets=executiveBullets();
- const lm=(typeof window.labAreaMetrics==='function')?window.labAreaMetrics():null;
- const attachLab=!!(lm&&lm.active>0&&typeof window.labCanAttachToGeneral==='function'&&window.labCanAttachToGeneral());
- const labMeta=(typeof labState!=='undefined'&&labState?.meta)?labState.meta:{};
  const meta={
-   reportNumber:state.meta.reportNumber||labMeta.reportNumber||'',
-   reportYear:state.meta.reportYear||labMeta.reportYear||String(new Date().getFullYear()),
-   prestador:state.meta.prestador||labMeta.prestador||'',
-   cuit:state.meta.cuit||labMeta.cuit||'',
-   province:state.meta.province||labMeta.province||'',
-   level:state.meta.level||labMeta.level||'',
-   type:state.meta.type||labMeta.type||'',
-   date:state.meta.date||labMeta.date||'',
-   auditor:state.meta.auditor||labMeta.auditor||currentSessionUser?.displayName||'',
-   address:state.meta.address||labMeta.address||''
+   reportNumber:state.meta.reportNumber||'',
+   reportYear:state.meta.reportYear||String(new Date().getFullYear()),
+   prestador:state.meta.prestador||'',
+   cuit:state.meta.cuit||'',
+   province:state.meta.province||'',
+   level:state.meta.level||'',
+   type:state.meta.type||'',
+   date:state.meta.date||'',
+   auditor:state.meta.auditor||currentSessionUser?.displayName||'',
+   address:state.meta.address||''
  };
  const localReportId=()=>`${meta.reportNumber||'S/N'}/${meta.reportYear||new Date().getFullYear()}`;
- const pooledActive=s.active+(attachLab?lm.active:0);
- const pooledAnswered=s.answered+(attachLab?lm.answered:0);
- const pooledDev=s.dev+(attachLab?lm.dev:0);
- const pooledMod=s.mod+(attachLab?lm.mod:0);
- const pooledHigh=s.high+(attachLab?lm.high:0);
- const pooledYes=Math.round(s.compliance*s.active)+(attachLab?lm.yes:0);
- const pooledCompliance=pooledActive?pooledYes/pooledActive:0;
- const baseIirs=currentIIRS().value||0;
- const pooledIirs=pooledActive?((baseIirs*s.active)+(attachLab?lm.iirs*lm.active:0))/pooledActive:baseIirs;
- const auditedAll=[...audited];if(attachLab&&!auditedAll.includes('Laboratorio'))auditedAll.push('Laboratorio');
- const labExecutive=attachLab&&typeof labExecutiveText==='function'?labExecutiveText():'';
- const combinedExecutive=[executive(),labExecutive].filter(Boolean).join(' ');
- const labSection=attachLab&&typeof window.labGeneralReportSection==='function'?window.labGeneralReportSection():'';
- const labDs=attachLab&&typeof labReportData==='function'?labReportData():[];
- const labTech=labDs.length?`<h3 class="area-heading">LABORATORIO</h3>${labDs.map(d=>`<div class="deviation-block"><h4>${esc(d.code)} · ${esc(d.deviation||d.item)}</h4>${d.observation?`<p><b>Observación y evidencia:</b> ${esc(d.observation)}</p>`:''}<p><b>Requisito:</b> ${esc(d.item)}</p><p><b>Área/proceso:</b> ${esc(d.section)}</p></div>`).join('')}`:'';
+ const active=s.active, answered=s.answered, dev=s.dev, mod=s.mod, high=s.high;
+ const compliance=s.compliance||0;
+ const iirs=currentIIRS().value||0;
  $("#reportContent").innerHTML=`<div class="report">
  <section class="cover"><h1>INFORME EJECUTIVO N° ${esc(localReportId())}</h1><h2>AUDITORÍA INTEGRAL PRESTACIONAL</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||"PRESTADOR")}</div></section>
- <section><h1>ÍNDICE</h1><div class="index-list">1. Datos del prestador y de la auditoría<br>2. Resumen ejecutivo<br>3. Objeto de la auditoría<br>4. Alcance<br>5. Panel general y análisis de riesgo<br>6. Área Laboratorio (si corresponde)<br>7. Conclusiones<br>8. Anexo técnico legal<br>9. Anexo técnico operativo - Desvíos por área y proceso</div></section>
- <section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(localReportId())}</td><th>Fecha</th><td>${esc(meta.date)}</td></tr><tr><th>Institución</th><td>${esc(meta.prestador)}</td><th>CUIT</th><td>${esc(meta.cuit)}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address)}</td><th>Jurisdicción</th><td>${esc(meta.province)}</td></tr><tr><th>Nivel</th><td>${esc(meta.level)}</td><th>Tipo</th><td>${esc(meta.type)}</td></tr><tr><th>Auditor</th><td colspan="3">${esc(meta.auditor)}</td></tr><tr><th>Áreas auditadas</th><td colspan="3">${esc(auditedAll.join(", "))}</td></tr></table></section>
- <section class="report-section"><h1>2. RESUMEN EJECUTIVO</h1><p>${esc(combinedExecutive)}</p>${bullets.length?`<p>En tal sentido se verificó:</p><ul class="red-list">${bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}<p>La evaluación consolidada comprende ${pooledActive} requisitos aplicables. Se registraron ${pooledDev} desvíos, de los cuales ${pooledHigh} son altos o críticos y ${pooledMod} moderados. El detalle se encuentra en los anexos técnicos por área.</p></section>
+ <section><h1>ÍNDICE</h1><div class="index-list">1. Datos del prestador y de la auditoría<br>2. Resumen ejecutivo<br>3. Objeto de la auditoría<br>4. Alcance<br>5. Panel general y análisis de riesgo<br>6. Conclusiones<br>7. Anexo técnico legal<br>8. Anexo técnico operativo - Desvíos por área y proceso</div></section>
+ <section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(localReportId())}</td><th>Fecha</th><td>${esc(meta.date)}</td></tr><tr><th>Institución</th><td>${esc(meta.prestador)}</td><th>CUIT</th><td>${esc(meta.cuit)}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address)}</td><th>Jurisdicción</th><td>${esc(meta.province)}</td></tr><tr><th>Nivel</th><td>${esc(meta.level)}</td><th>Tipo</th><td>${esc(meta.type)}</td></tr><tr><th>Auditor</th><td colspan="3">${esc(meta.auditor)}</td></tr><tr><th>Áreas auditadas</th><td colspan="3">${esc(audited.join(", "))}</td></tr></table></section>
+ <section class="report-section"><h1>2. RESUMEN EJECUTIVO</h1><p>${esc(executive())}</p>${bullets.length?`<p>En tal sentido se verificó:</p><ul class="red-list">${bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}<p>La evaluación consolidada comprende ${active} requisitos aplicables. Se registraron ${dev} desvíos, de los cuales ${high} son altos o críticos y ${mod} moderados. El detalle se encuentra en los anexos técnicos por área.</p></section>
  <section class="report-section"><h1>3. OBJETO DE LA AUDITORÍA</h1><p>El objeto de la presente auditoría es verificar el cumplimiento del proceso prestacional en las áreas seleccionadas, conforme al vínculo prestacional con el INSSJP, evaluando aspectos legales, organizativos, técnicos y de calidad de la traza de atención y de los procesos de apoyo auditados.</p></section>
- <section class="report-section"><h1>4. ALCANCE</h1><p>Análisis del proceso prestacional mediante el relevamiento de las siguientes áreas: <b>${esc(auditedAll.join(", "))}</b>.</p><p>Para llevar adelante la tarea precitada:</p><ul>${scopeText()}</ul><p>El alcance se limita a las áreas seleccionadas y a la evidencia efectivamente disponible y observada durante el relevamiento.</p></section>
- ${interviewReportBlock()}<section class="report-section"><h1>5. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS consolidado (0–5)</th></tr><tr><td>${pooledActive}</td><td>${pooledAnswered}</td><td>${pooledDev}</td><td>${pooledMod}</td><td>${pooledHigh}</td><td>${(pooledCompliance*100).toFixed(1)}%</td><td>${Number(pooledIirs).toFixed(2)}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}${attachLab&&typeof labActText==='function'?` ${esc(labActText())}`:''}</div></section>
- ${labSection}
- <section class="report-section"><h1>7. CONCLUSIONES</h1><p>${esc(conclusionsText())}${attachLab&&typeof labExecutiveText==='function'?` ${esc(labExecutiveText())}`:''}</p></section>
- <section class="report-section"><h1>8. ANEXO TÉCNICO LEGAL</h1>${legalAnnex()}${attachLab?'<h3>Laboratorio</h3><p>Se incorpora la normativa específica consignada en la guía y matriz técnica de Laboratorio, sujeta a validación según jurisdicción, nivel y requisito.</p>':''}<p class="small">Las referencias normativas deben validarse según jurisdicción, nivel, tipo de establecimiento y requisito concreto antes de citar artículos específicos.</p></section>
- <section class="report-section"><h1>9. ANEXO TÉCNICO OPERATIVO - DESVÍOS POR ÁREA Y PROCESO</h1>${technicalAnnex()}${labTech}</section>
+ <section class="report-section"><h1>4. ALCANCE</h1><p>Análisis del proceso prestacional mediante el relevamiento de las siguientes áreas: <b>${esc(audited.join(", "))}</b>.</p><p>Para llevar adelante la tarea precitada:</p><ul>${scopeText()}</ul><p>El alcance se limita a las áreas seleccionadas y a la evidencia efectivamente disponible y observada durante el relevamiento.</p></section>
+ ${interviewReportBlock()}<section class="report-section"><h1>5. PANEL GENERAL Y ANÁLISIS DE RIESGO</h1><table><tr><th>Ítems aplicables</th><th>Respondidos</th><th>Desvíos</th><th>Moderados</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS consolidado (0–5)</th></tr><tr><td>${active}</td><td>${answered}</td><td>${dev}</td><td>${mod}</td><td>${high}</td><td>${(compliance*100).toFixed(1)}%</td><td>${Number(iirs).toFixed(2)}</td></tr></table>${rhReportBlock()}<h2>Síntesis para el acta</h2><div class="summary-text">${esc(actSummary())}</div></section>
+ <section class="report-section"><h1>6. CONCLUSIONES</h1><p>${esc(conclusionsText())}</p></section>
+ <section class="report-section"><h1>7. ANEXO TÉCNICO LEGAL</h1>${legalAnnex()}<p class="small">Las referencias normativas deben validarse según jurisdicción, nivel, tipo de establecimiento y requisito concreto antes de citar artículos específicos.</p></section>
+ <section class="report-section"><h1>8. ANEXO TÉCNICO OPERATIVO - DESVÍOS POR ÁREA Y PROCESO</h1>${technicalAnnex()}</section>
  <div class="signature">Firma del auditor</div></div>`;
 }
 function renderAll(){
@@ -1010,12 +993,12 @@ function friendlyAuthError(e){
 
 // ===== MAPA PRESTACIONAL DEMOSTRATIVO V3.4.1 =====
 const DEMO_PROVIDERS = [
- {id:'demo-caba-1',name:'Hospital Metropolitano de Prueba',province:'CABA',city:'Ciudad Autónoma de Buenos Aires',lat:-34.6037,lng:-58.3816,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:18450,compliance:88,iirs:1.2,lastAudit:'28/07/2026',areas:['Área Médica','Enfermería','Laboratorio','Hemoterapia','Imágenes']},
+ {id:'demo-caba-1',name:'Hospital Metropolitano de Prueba',province:'CABA',city:'Ciudad Autónoma de Buenos Aires',lat:-34.6037,lng:-58.3816,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:18450,compliance:88,iirs:1.2,lastAudit:'28/07/2026',areas:['Área Médica','Enfermería','Hemoterapia','Imágenes']},
  {id:'demo-ba-1',name:'Clínica Regional Oeste',province:'Buenos Aires',city:'Luján',lat:-34.5703,lng:-59.1050,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:9300,compliance:72,iirs:2.7,lastAudit:'22/07/2026',areas:['Área Médica','Enfermería','Esterilización','Limpieza','Lavadero']},
  {id:'demo-cordoba-1',name:'Sanatorio Central Córdoba',province:'Córdoba',city:'Córdoba',lat:-31.4201,lng:-64.1888,type:'Sanatorio',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:12680,compliance:54,iirs:4.1,lastAudit:'15/07/2026',areas:['Área Médica','Enfermería','Hemodinamia','Imágenes','Farmacia']},
- {id:'demo-santafe-1',name:'Instituto Asistencial del Litoral',province:'Santa Fe',city:'Rosario',lat:-32.9442,lng:-60.6505,type:'Instituto médico',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:11120,compliance:81,iirs:1.9,lastAudit:'09/07/2026',areas:['Área Médica','Enfermería','Laboratorio','Nutrición']},
+ {id:'demo-santafe-1',name:'Instituto Asistencial del Litoral',province:'Santa Fe',city:'Rosario',lat:-32.9442,lng:-60.6505,type:'Instituto médico',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:11120,compliance:81,iirs:1.9,lastAudit:'09/07/2026',areas:['Área Médica','Enfermería','Nutrición']},
  {id:'demo-mendoza-1',name:'Centro Médico Andino',province:'Mendoza',city:'Mendoza',lat:-32.8895,lng:-68.8458,type:'Centro médico',complexity:'Baja complejidad',module:'Atención ambulatoria',capitas:4800,compliance:93,iirs:0.7,lastAudit:'01/07/2026',areas:['Área Médica','Enfermería','Imágenes']},
- {id:'demo-tucuman-1',name:'Clínica del Norte',province:'Tucumán',city:'San Miguel de Tucumán',lat:-26.8083,lng:-65.2176,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:7600,compliance:63,iirs:3.2,lastAudit:'25/06/2026',areas:['Área Médica','Enfermería','Laboratorio','Hemoterapia']},
+ {id:'demo-tucuman-1',name:'Clínica del Norte',province:'Tucumán',city:'San Miguel de Tucumán',lat:-26.8083,lng:-65.2176,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:7600,compliance:63,iirs:3.2,lastAudit:'25/06/2026',areas:['Área Médica','Enfermería','Hemoterapia']},
  {id:'demo-neuquen-1',name:'Hospital Patagónico de Prueba',province:'Neuquén',city:'Neuquén',lat:-38.9516,lng:-68.0591,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:6900,compliance:null,iirs:null,lastAudit:'Sin auditoría',areas:[]}
 ];
 let providerMapInstance=null;
@@ -1101,7 +1084,6 @@ const FOLLOWUP_DEMO_CASES = [
   {id:'MED-022',area:'Área Médica',service:'Guardia',risk:4,deviation:'No se acredita protocolo actualizado para la atención inicial de emergencias.',recommendation:'Aprobar, difundir y capacitar sobre protocolo de emergencias.',evidence:'Protocolo firmado, nómina de capacitación y evaluación.',deadline:'30 días',status:'pendiente',followupNote:''}
  ]},
  {id:'seg-rosario-01',provider:'Instituto Asistencial del Litoral',province:'Santa Fe',city:'Rosario',auditDate:'28/07/2026',report:'GAP-2026-0041',level:'Internación / II Nivel',capitas:11120,ugl:'UGL IX · Rosario',deviations:[
-  {id:'LAB-011',area:'Laboratorio',service:'Laboratorio',risk:4,deviation:'No se evidencia control documentado de temperaturas en equipos críticos.',recommendation:'Implementar control diario, límites de aceptación y acciones ante desvíos.',evidence:'Registros de 30 días y certificados de calibración.',deadline:'20 días',status:'pendiente',followupNote:''},
   {id:'NUT-008',area:'Nutrición',service:'Nutrición',risk:3,deviation:'No se acredita evaluación nutricional oportuna en todos los pacientes internados.',recommendation:'Establecer tamizaje al ingreso y seguimiento según riesgo.',evidence:'Historias clínicas y protocolo de tamizaje.',deadline:'45 días',status:'parcial',followupNote:'Se inició implementación, resta cobertura completa.'}
  ]}
 ];
@@ -1111,13 +1093,12 @@ const FOLLOWUP_LIVE_KEY='sigap_followup_live_status_v1';
 function saveFollowupDemo(){localStorage.setItem('sigap_followup_demo',JSON.stringify(followupDemoState))}
 function currentAuditFollowupCase(){
  const nursing=deviations().map(i=>{const t=technicalFor(i);return {id:i.code,area:i.service||'Enfermería',service:i.service||'Enfermería',risk:i.score||3,deviation:t.deviation,recommendation:t.rec,evidence:t.ev,deadline:t.plazo||'A definir',status:'pendiente',followupNote:'',source:'general'}});
- const lab=(typeof window.labFollowupDeviations==='function')?window.labFollowupDeviations():[];
- const all=[...nursing,...lab];if(!all.length)return null;
+ const all=[...nursing];if(!all.length)return null;
  const saved=JSON.parse(localStorage.getItem(FOLLOWUP_LIVE_KEY)||'{}');
  all.forEach(d=>{const k=`${d.source||'x'}:${d.id}`;if(saved[k])Object.assign(d,saved[k])});
- const provider=state.meta.prestador||labState?.meta?.prestador||'Auditoría actual';
+ const provider=state.meta.prestador||'Auditoría actual';
  const report=reportId?reportId():'Informe actual';
- return {id:'current-audit',provider,province:state.meta.province||labState?.meta?.province||'',city:state.meta.address||labState?.meta?.address||'',auditDate:state.meta.date||labState?.meta?.date||new Date().toISOString().slice(0,10),report,level:`Nivel ${state.meta.level||labState?.meta?.level||''}`,capitas:0,ugl:labState?.meta?.ugl||'UGL de destino',deviations:all,live:true};
+ return {id:'current-audit',provider,province:state.meta.province||'',city:state.meta.address||'',auditDate:state.meta.date||new Date().toISOString().slice(0,10),report,level:`Nivel ${state.meta.level||''}`,capitas:0,ugl:'UGL de destino',deviations:all,live:true};
 }
 function currentFollowupCase(){const id=document.getElementById('followupProvider')?.value;if(id==='current-audit')return currentAuditFollowupCase()||followupDemoState[0];return followupDemoState.find(x=>x.id===id)||currentAuditFollowupCase()||followupDemoState[0]}
 function followupFiltered(caseData){const area=document.getElementById('followupArea')?.value||'',status=document.getElementById('followupStatus')?.value||'';return caseData.deviations.filter(d=>(!area||d.area===area)&&(!status||d.status===status))}
@@ -1162,7 +1143,6 @@ function lockApplication(){
  document.getElementById('executiveNav')?.classList.add('hide');
  document.getElementById('providerMapNav')?.classList.add('hide');
  document.getElementById('followupNav')?.classList.add('hide');
- document.getElementById('laboratoryNav')?.classList.add('hide');
 }
 function unlockApplication(){
  const gate=document.getElementById('authGate');gate?.classList.add('auth-success');
@@ -1224,17 +1204,25 @@ function renderAdminUsers(){
   const email=normalizeEmail(u.correo||u.id),self=email===normalizeEmail(currentSessionUser?.email),primary=normalizeEmail(currentSessionUser?.email)===PRIMARY_ADMIN_EMAIL;
   const roleOptions=['auditor','gerente','subgerente','jefa_medicas','jefa_sociales','administrador'].map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${roleLabel(r)}</option>`).join('');
   const specialtyOptions=[
-   ['','Sin asignar'],['enfermeria','Enfermería'],['laboratorio','Laboratorio / Bioquímica'],['medica','Médica'],['farmacia','Farmacia'],['imagenes','Imágenes'],['psicologia','Psicología / Salud Mental'],['hemoterapia','Hemoterapia'],['nutricion','Nutrición'],['administracion','Administración'],['sociales','Social']
+   ['','Sin asignar'],['enfermeria','Enfermería'],['medica','Médica'],['farmacia','Farmacia'],['imagenes','Imágenes'],['psicologia','Psicología / Salud Mental'],['hemoterapia','Hemoterapia'],['nutricion','Nutrición'],['administracion','Administración'],['sociales','Social']
   ].map(([v,l])=>`<option value="${v}" ${String(u.especialidad||'')===v?'selected':''}>${l}</option>`).join('');
-  return `<div class="admin-user-card"><div class="admin-user-head"><div><div class="admin-user-name">${esc(`${u.nombre||''} ${u.apellido||''}`.trim()||email)}</div><div class="admin-user-meta">${esc(email)}<br>Rol: ${esc(roleLabel(u.rol||'auditor'))}<br>Especialidad: ${esc(labSpecialtyLabel(u.especialidad))}</div></div><span class="user-state user-state-${esc(u.estado||'pendiente')}">${esc(u.estado||'pendiente')}</span></div><div class="admin-user-actions">${u.estado!=='autorizado'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Autorizar</button>`:''}${u.estado!=='rechazado'?`<button class="secondary" onclick="setUserStatus('${esc(email)}','rechazado')">Rechazar</button>`:''}${u.estado==='autorizado'&&!self?`<button class="danger" onclick="setUserStatus('${esc(email)}','suspendido')">Suspender</button>`:''}${u.estado==='suspendido'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Reactivar</button>`:''}${!self?`<button class="danger" onclick="deleteUserRecord('${esc(email)}')">Eliminar registro</button>`:''}</div><div class="role-editor"><label>Especialidad operativa</label><select id="specialty-${safeDomId(email)}">${specialtyOptions}</select><button class="secondary" onclick="setUserSpecialty('${esc(email)}')">Guardar especialidad</button></div>${primary?`<div class="role-editor"><label>Rol</label><select id="role-${safeDomId(email)}">${roleOptions}</select><button class="secondary" onclick="setUserRole('${esc(email)}')">Guardar rol</button></div>`:''}</div>`;
+  return `<div class="admin-user-card"><div class="admin-user-head"><div><div class="admin-user-name">${esc(`${u.nombre||''} ${u.apellido||''}`.trim()||email)}</div><div class="admin-user-meta">${esc(email)}<br>Rol: ${esc(roleLabel(u.rol||'auditor'))}<br>Especialidad: ${esc(specialtyLabel(u.especialidad))}</div></div><span class="user-state user-state-${esc(u.estado||'pendiente')}">${esc(u.estado||'pendiente')}</span></div><div class="admin-user-actions">${u.estado!=='autorizado'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Autorizar</button>`:''}${u.estado!=='rechazado'?`<button class="secondary" onclick="setUserStatus('${esc(email)}','rechazado')">Rechazar</button>`:''}${u.estado==='autorizado'&&!self?`<button class="danger" onclick="setUserStatus('${esc(email)}','suspendido')">Suspender</button>`:''}${u.estado==='suspendido'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Reactivar</button>`:''}${!self?`<button class="danger" onclick="deleteUserRecord('${esc(email)}')">Eliminar registro</button>`:''}</div><div class="role-editor"><label>Especialidad operativa</label><select id="specialty-${safeDomId(email)}">${specialtyOptions}</select><button class="secondary" onclick="setUserSpecialty('${esc(email)}')">Guardar especialidad</button></div>${primary?`<div class="role-editor"><label>Rol</label><select id="role-${safeDomId(email)}">${roleOptions}</select><button class="secondary" onclick="setUserRole('${esc(email)}')">Guardar rol</button></div>`:''}</div>`;
  }).join('');
 }
 
+function specialtyLabel(v){
+ const x=String(v||'').toLowerCase();
+ return ({enfermeria:'Enfermería',medica:'Médica',farmacia:'Farmacia',imagenes:'Imágenes',psicologia:'Psicología / Salud Mental',hemoterapia:'Hemoterapia',nutricion:'Nutrición',administracion:'Administración',sociales:'Social'})[x]||'Sin asignar';
+}
+function applySpecialtyVisibility(){
+ const startBtn=document.getElementById('startAuditButton');
+ if(startBtn){startBtn.textContent='Comenzar auditoría';startBtn.onclick=()=>showPage('auditPage',document.getElementById('auditNav'));}
+}
 function auditorAreaRoleLabel(){
  const role=String(currentSessionUser?.role||'auditor').toLowerCase();
  if(role!=='auditor')return roleLabel(role);
  const sp=String(currentSessionUser?.profile?.especialidad||currentSessionUser?.profile?.especialidadOperativa||'').toLowerCase();
- return ({enfermeria:'Auditor del Área de Enfermería',laboratorio:'Auditor del Área Laboratorio',medica:'Auditor del Área Médica',farmacia:'Auditor del Área Farmacia',imagenes:'Auditor del Área Imágenes',psicologia:'Auditor del Área Psicología / Salud Mental',hemoterapia:'Auditor del Área Hemoterapia',nutricion:'Auditor del Área Nutrición',administracion:'Auditor del Área Administración',sociales:'Auditor del Área Social'})[sp]||'Auditor';
+ return ({enfermeria:'Auditor del Área de Enfermería',medica:'Auditor del Área Médica',farmacia:'Auditor del Área Farmacia',imagenes:'Auditor del Área Imágenes',psicologia:'Auditor del Área Psicología / Salud Mental',hemoterapia:'Auditor del Área Hemoterapia',nutricion:'Auditor del Área Nutrición',administracion:'Auditor del Área Administración',sociales:'Auditor del Área Social'})[sp]||'Auditor';
 }
 function roleLabel(role){return({administrador:'Administrador',gerente:'Gerente',subgerente:'Subgerente',jefa_medicas:'Jefa Departamento Médicas',jefa_sociales:'Jefa Departamento Sociales',auditor:'Auditor'})[role]||role}
 function safeDomId(v){return String(v).replace(/[^a-z0-9_-]/gi,'_')}
