@@ -4,7 +4,8 @@ const KEY="siape_profesional_v2_auditoria";
 const LIBKEY="siape_profesional_v2_guardadas";
 let state=JSON.parse(localStorage.getItem(KEY)||"null")||{
  meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},
- answers:{}, enabled:Object.fromEntries(["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"].map(x=>[x,true])),
+ answers:{}, enabled:Object.fromEntries(["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia","Laboratorio"].map(x=>[x,true])),
+ labProfile:defaultLabProfile(), labInterview:defaultLabInterview(),
  interview:{date:"",time:"",place:"",area:"",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true},
  rh:{service:"Internación general",shift:"Mañana",beds:0,occupied:0,normRef:"",method:"mixto",licensed:0,nurses:0,assistants:0,supervisors:0,absence:0,evidence:"",requiredNorm:0,pMin:0,mMin:0,pMod:0,mMod:0,pEsp:0,mEsp:0,pInt:0,mInt:0,productiveMinutes:360,upeTotal:0,upePerWorker:1,result:null}
 };
@@ -35,10 +36,18 @@ function autoSaveSecurity(){
  }catch(e){console.error(e);showAutoSaveToast('<b>⚠️ No se pudo completar el autoguardado.</b><br>Utilice el botón Guardar.',true);}
 }
 setInterval(autoSaveSecurity,10*60*1000);
+function defaultWeekSchedule(){return {lunes:"",martes:"",miercoles:"",jueves:"",viernes:"",sabado:"",domingo:""}}
+function defaultLabEquipment(){return {
+ "Microscopio":{qty:0,obs:""},"Cámara de Neubauer":{qty:0,obs:""},"Espectrofotómetro":{qty:0,obs:""},"Baño termostático":{qty:0,obs:""},"Microcentrífuga":{qty:0,obs:""},
+ "Autoanalizador de química clínica":{qty:0,obs:""},"Contador hematológico":{qty:0,obs:""},"Coagulómetro":{qty:0,obs:""},"Analizador de electrolitos / ion selectivo / fotómetro de llama":{qty:0,obs:""}
+}}
+function defaultLabProfile(){return {directorName:"",directorSpecialty:"",directorLicense:"",biochemists:0,technicians:0,administrative:0,cleaningStaff:0,biochemSchedule:defaultWeekSchedule(),ownership:"",locationType:"",location:"",reportPaper:false,reportElectronic:false,avgPatients:0,operationSchedule:defaultWeekSchedule(),guardType:"",guardBiochemist:"",equipmentMode:"",equipment:defaultLabEquipment(),otherEquipment:""}}
+function defaultLabInterview(){return {date:new Date().toISOString().slice(0,10),time:"",place:"",area:"Laboratorio",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true}}
+
 function defaultInterview(){return {date:state?.meta?.date||new Date().toISOString().slice(0,10),time:"",place:"",area:"Área Enfermería: Enfermería, Esterilización, Hemodinamia, Limpieza y Lavadero",interviewees:"",auditors:"",summary:"",documents:"",commitments:"",additional:"",auditorNotes:"",includeInReport:true}}
 function ensureState(){
  state.meta=state.meta||{};state.answers=state.answers||{};state.enabled=state.enabled||{};
- const activeGuides=["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"];
+ const activeGuides=["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia","Laboratorio"];
  activeGuides.forEach(x=>{if(typeof state.enabled[x]!=="boolean")state.enabled[x]=true;});
  // Migración V3.4.15: la V3.4.14 había deshabilitado Enfermería. Se restaura una sola vez.
  if(localStorage.getItem("siape_v3415_enfermeria_restored")!=="1"){
@@ -46,7 +55,18 @@ function ensureState(){
    localStorage.setItem(KEY,JSON.stringify(state));
    localStorage.setItem("siape_v3415_enfermeria_restored","1");
  }
+ // Migración V3.4.18: Laboratorio vuelve a incorporarse como área profesional independiente.
+ if(localStorage.getItem("siape_v3418_laboratorio_enabled")!=="1"){
+   state.enabled["Laboratorio"]=true;
+   localStorage.setItem(KEY,JSON.stringify(state));
+   localStorage.setItem("siape_v3418_laboratorio_enabled","1");
+ }
  state.interview={...defaultInterview(),...(state.interview||{})};
+ state.labProfile={...defaultLabProfile(),...(state.labProfile||{})};
+ state.labProfile.biochemSchedule={...defaultWeekSchedule(),...(state.labProfile.biochemSchedule||{})};
+ state.labProfile.operationSchedule={...defaultWeekSchedule(),...(state.labProfile.operationSchedule||{})};
+ state.labProfile.equipment={...defaultLabEquipment(),...(state.labProfile.equipment||{})};
+ state.labInterview={...defaultLabInterview(),...(state.labInterview||{})};
  state.rh={...defaultRH(),...(state.rh||{})};
 }
 ensureState();
@@ -84,7 +104,79 @@ const TECHNICAL_OVERRIDES={
   plazo:"Implementación inmediata y consolidación documental en 30 días"
  }
 };
+function laboratoryTechnical(item){
+ const t=((item.item||"")+" "+(item.domain||"")+" "+(item.process||"")+" "+(item.subprocess||"")).toLowerCase();
+ let why="",rec="",ev="",resp="Dirección Técnica / Responsable del Laboratorio / Calidad",plazo=item.score>=5?"Inmediato / hasta 24 h":item.score===4?"Hasta 15 días":item.score===3?"Hasta 30 días":"Hasta 60 días";
+ if(/identificaci[oó]n|concordancia paciente|dos datos|tubo|anticoagulante|integridad de muestra/.test(t)){
+  why="La fase preanalítica concentra riesgos capaces de generar errores paciente-muestra, alteración de la integridad de la muestra o resultados no representativos. La identificación insuficiente, la discordancia entre solicitud y muestra o el uso de tubos/anticoagulantes inadecuados puede invalidar el proceso y producir decisiones clínicas erróneas.";
+  rec="Estandarizar la identificación con al menos dos datos inequívocos, verificar concordancia paciente-solicitud-muestra, definir tubos y anticoagulantes por práctica, documentar criterios de rechazo y capacitar al personal de extracción y recepción.";
+  ev="Procedimiento preanalítico, instructivos de extracción, etiquetas y solicitudes, registros de rechazo, trazabilidad de recepción, capacitación y auditorías de adherencia.";
+  resp="Dirección Técnica / Bioquímico responsable / Personal de extracción y recepción / Calidad";
+ }else if(/control de calidad interno|control interno|tratamiento estad[ií]stico|levey|acciones correctivas.*control/.test(t)){
+  why="El control de calidad interno demuestra la estabilidad del sistema analítico y permite detectar errores antes de liberar resultados. Su ausencia, frecuencia insuficiente, falta de registro o falta de tratamiento de resultados fuera de aceptación impide demostrar la validez analítica y puede permitir la emisión de resultados clínicamente incorrectos.";
+  rec="Implementar un programa documentado de control interno para cada equipo y práctica aplicable, con frecuencia definida, materiales de control, límites de aceptación, análisis estadístico, reglas de decisión y acciones correctivas documentadas antes de liberar resultados.";
+  ev="Registros de controles, gráficos/tendencias, lotes y vencimientos, criterios de aceptación, acciones correctivas, bloqueo/liberación de equipos y revisión por profesional responsable.";
+  resp="Dirección Técnica / Bioquímico responsable / Responsable de Calidad";
+ }else if(/calidad externo|peec|evaluaci[oó]n externa/.test(t)){
+  why="La evaluación externa de la calidad aporta una comparación independiente del desempeño analítico. La ausencia de participación, cobertura insuficiente de prácticas, reportes no disponibles o falta de acciones correctivas limita la capacidad de demostrar exactitud y comparabilidad de los resultados.";
+  rec="Asegurar participación en PEEC o programa equivalente según cartera prestacional, conservar reportes, analizar resultados, documentar desvíos y ejecutar acciones correctivas con seguimiento de eficacia.";
+  ev="Inscripción al programa, cronograma, reportes de rondas, análisis de resultados, acciones correctivas y evidencia de cierre.";
+  resp="Dirección Técnica / Responsable de Calidad / Bioquímicos de sector";
+ }else if(/reactivo|lote|vencimiento/.test(t)){
+  why="La vigencia y trazabilidad de reactivos y controles son necesarias para asegurar que los insumos analíticos mantienen las condiciones declaradas. Reactivos vencidos o sin trazabilidad de lote, preparación y vencimiento pueden alterar la confiabilidad del resultado.";
+  rec="Segregar y retirar insumos vencidos, implementar control de lotes y vencimientos, registrar preparación y apertura cuando corresponda, y vincular los reactivos/controles con los equipos y corridas analíticas.";
+  ev="Inventario, registros de lote/vencimiento/apertura, etiquetas, comprobantes de baja, trazabilidad de corridas y controles de stock.";
+  resp="Dirección Técnica / Bioquímico de sector / Responsable de Calidad";
+ }else if(/temperatura|heladera|freezer|estufa|baño termost/.test(t)){
+  why="El control de temperatura permite demostrar que muestras, reactivos, controles y equipos se conservan dentro de condiciones definidas. La ausencia de medición o registro impide acreditar la estabilidad de los materiales y puede afectar la confiabilidad de los resultados.";
+  rec="Definir rangos aceptables, realizar y registrar controles con frecuencia establecida, usar instrumentos verificados, documentar desvíos y acciones correctivas y contar con contingencia ante fallas o cortes de energía.";
+  ev="Planillas o registros electrónicos de temperatura, identificación del equipo, rangos, termómetros verificados, alarmas, acciones correctivas y mantenimiento.";
+  resp="Dirección Técnica / Bioquímico responsable / Mantenimiento / Calidad";
+ }else if(/bacteriolog|microbiolog|autoclave|flujo de aire|ventilaci[oó]n/.test(t)){
+  why="Las prácticas microbiológicas requieren segregación, condiciones ambientales y barreras acordes al riesgo para reducir exposición, contaminación cruzada y dispersión de agentes biológicos. Deficiencias de aislamiento, ventilación o descontaminación pueden comprometer al personal, las muestras y el ambiente.";
+  rec="Adecuar la sectorización y el cerramiento, definir ventilación y flujo según riesgo, garantizar equipamiento de descontaminación, señalización, procedimientos de ingreso/egreso, limpieza, gestión de residuos y mantenimiento documentado.";
+  ev="Plano/sectorización, verificación de ventilación, mantenimiento, procedimientos de bioseguridad, registros de autoclave/descontaminación, capacitación y control de residuos.";
+  resp="Dirección Técnica / Responsable de Microbiología / Higiene y Seguridad / Control de Infecciones";
+ }else if(/residuo|descarte|cortopunz|bolsa roja|l[ií]quidos residuales/.test(t)){
+  why="La segregación, contención y disposición segura de residuos y líquidos de laboratorio reduce accidentes, exposición ocupacional y contaminación ambiental. El descarte inadecuado de cortopunzantes, residuos patogénicos o líquidos químicos/biológicos puede generar lesiones y exposición a agentes peligrosos.";
+  rec="Implementar segregación en origen, bolsas y descartadores adecuados, procedimientos para residuos sólidos y líquidos, almacenamiento transitorio seguro, retiro por circuito definido y capacitación del personal.";
+  ev="Procedimientos, recipientes y señalización, registros de retiro, manifiestos/constancias cuando correspondan, capacitación y verificación directa.";
+  resp="Dirección Técnica / Higiene y Seguridad / Responsable de Residuos / Personal de Laboratorio";
+ }else if(/mantenimiento|equipamiento necesario|equipo para determinaci[oó]n de gases|grupo electr[oó]geno/.test(t)){
+  why="La capacidad resolutiva del laboratorio depende de equipamiento disponible, mantenido y apto para las prácticas requeridas. La falta de equipos indispensables o de mantenimiento documentado puede interrumpir prestaciones esenciales o generar resultados no confiables.";
+  rec="Completar el equipamiento requerido según cartera y complejidad, implementar mantenimiento preventivo/correctivo documentado, verificar calibración cuando corresponda y establecer contingencias para fallas de equipos críticos.";
+  ev="Inventario, órdenes de trabajo, mantenimiento preventivo/correctivo, certificados, controles funcionales, contratos de service y plan de contingencia.";
+  resp="Dirección Técnica / Ingeniería Clínica o Mantenimiento / Dirección institucional";
+ }else if(/informe|validaci[oó]n|valores cr[ií]ticos|backup|respaldo|lis|archivo|comunicaci[oó]n/.test(t)){
+  why="La fase postanalítica debe asegurar que el resultado correcto llegue al paciente correcto, validado por el profesional responsable, con trazabilidad y posibilidad de recuperación. Deficiencias de validación, comunicación, respaldo o identificación del informe pueden generar errores clínicos, pérdida de información o demoras relevantes.";
+  rec="Estandarizar validación y liberación, contenido mínimo del informe, comunicación de valores críticos, canales institucionales seguros, respaldo de datos y trazabilidad de modificaciones y derivaciones.";
+  ev="Informes emitidos, registros de validación, procedimiento de valores críticos, logs/LIS o registros manuales, backups, archivo y registros de derivación.";
+  resp="Dirección Técnica / Bioquímico responsable / Sistemas / Calidad";
+ }else if(/direcci[oó]n t[eé]cnica|matr[ií]cula|t[ií]tulo|bioqu[ií]mico|personal t[eé]cnico|guardia/.test(t)){
+  why="La disponibilidad y acreditación del recurso humano define responsabilidad profesional, supervisión y continuidad del proceso. La ausencia del profesional requerido, documentación habilitante irregular o cobertura insuficiente puede impedir garantizar la prestación en forma segura y oportuna.";
+  rec="Regularizar designaciones y legajos, verificar títulos y matrículas vigentes, adecuar cobertura profesional al horario y nivel de resolución y documentar cronogramas, guardias y reemplazos.";
+  ev="Legajos, títulos, matrículas, designación de Dirección Técnica, cronogramas, guardias, partes diarios y registros de presencia.";
+  resp="Dirección institucional / Dirección Técnica / Recursos Humanos";
+ }else if(/manual|procedimiento|capacitaci[oó]n|indicador|gesti[oó]n de calidad/.test(t)){
+  why="La documentación vigente, capacitación y seguimiento mediante indicadores permiten estandarizar procesos, reducir variabilidad y demostrar mejora continua. Su ausencia debilita la trazabilidad y dificulta detectar y corregir fallas del sistema.";
+  rec="Elaborar o actualizar procedimientos, aprobarlos y controlar versiones, capacitar al personal, definir indicadores relevantes, analizar resultados y documentar acciones de mejora.";
+  ev="Manuales y procedimientos vigentes, control de versiones, registros de capacitación, indicadores, actas de revisión y planes de mejora.";
+  resp="Dirección Técnica / Responsable de Calidad";
+ }else if(/terceriz/.test(t)){
+  why="Cuando el servicio es tercerizado, la institución mantiene la necesidad de asegurar alcance, responsabilidades, trazabilidad y calidad de la prestación contratada. La falta de contrato vigente o imposibilidad de verificar al tercero limita la supervisión del proceso.";
+  rec="Formalizar convenio/contrato, definir cartera, tiempos, responsabilidades, trazabilidad y mecanismos de auditoría; verificar habilitaciones y desempeño del laboratorio contratado.";
+  ev="Contrato vigente, anexos prestacionales, habilitaciones, indicadores, informes de auditoría y registros de derivación/recepción de resultados.";
+  resp="Dirección institucional / Dirección Técnica / Contrataciones / Auditoría prestacional";
+ }else{
+  why="El requisito forma parte de la estructura y funcionamiento seguro del Laboratorio. Su incumplimiento puede afectar la estandarización, continuidad, trazabilidad o confiabilidad del proceso preanalítico, analítico, postanalítico o de apoyo.";
+  rec="Regularizar el requisito, asignar responsable, documentar la medida correctiva y verificar su eficacia mediante evidencia objetiva.";
+  ev="Documentación respaldatoria, registros, procedimientos, mantenimiento o verificación directa según el requisito.";
+ }
+ return {deviation:negative(item.item)+".",why,rec,ev,resp,plazo};
+}
+
 function technicalFor(item){
+ if(item.service==="Laboratorio")return laboratoryTechnical(item);
  if(item.code==="ENF-RH-001")return {deviation:"Se verifica dotación insuficiente de personal de enfermería.",why:"La dotación disponible no alcanza la cobertura requerida según el método de cálculo seleccionado. La insuficiencia de personal limita la vigilancia continua, la ejecución oportuna de cuidados, la administración segura de medicamentos y la respuesta ante cambios clínicos o eventos críticos.",rec:"Adecuar la dotación de enfermería al requerimiento calculado, revisar la distribución por turnos y competencias, cubrir vacantes y ausentismo, y documentar la planificación de personal con reevaluación periódica de la carga de cuidados.",ev:"Plantel nominal, cronograma y parte diario por turno, matrículas y categorías profesionales, cálculo de dotación, registro de ausentismo y evidencia de incorporaciones o redistribución.",resp:"Dirección Médica / Departamento o Jefatura de Enfermería / Recursos Humanos",plazo:(state.rh?.result?.riskScore||0)>=5?"Inmediato":"30 días"};
  const exact=TECHNICAL_OVERRIDES[item.code];
  return exact?{...exact}:technical(item.item,item.domain,item.service);
@@ -291,7 +383,7 @@ function renderProviderRanking(){
  });
  const rows=Object.values(latest).map(snap=>{
   const idx=snapshotIIRS(snap),m=snap.state?.meta||{};
-  const areas=services.filter(sv=>snap.state?.enabled?.[sv]!==false&&ITEMS.some(i=>i.service===sv&&String(i.levels||"").includes(m.level||"III"))).length;
+  const areas=allServices.filter(sv=>snapshotIIRS(snap,sv).evaluated>0).length;
   return {name:m.prestador||"Prestador",level:m.level||"—",date:m.date||"—",areas,index:idx};
  }).filter(x=>x.index.value!=null).sort((a,b)=>a.index.value-b.index.value||a.name.localeCompare(b.name,'es'));
  body.innerHTML=rows.length?rows.map((x,n)=>`<tr><td>${n+1}</td><td>${esc(x.name)}</td><td>${esc(x.level)}</td><td>${esc(x.date)}</td><td>${x.areas}</td><td>${iirsBadge(x.index)}</td></tr>`).join(""):'<tr><td colspan="6">Todavía no hay auditorías guardadas con respuestas suficientes para calcular el índice.</td></tr>';
@@ -338,7 +430,7 @@ function renderExecutiveDashboard(){
   ['Auditorías guardadas',audits.length],['Prestadores',uniqueProviders],['IIRS promedio',avg==null?'—':avg.toFixed(2)],['Prestadores en rojo',redProviders],['Desvíos altos/críticos',highDeviations]
  ].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
 
- const areaRows=services.map(service=>{
+ const areaRows=allServices.map(service=>{
   const vals=audits.map(x=>snapshotIIRS(x.snap,service)).filter(x=>x.value!=null);
   if(!vals.length)return null;
   const average=vals.reduce((a,x)=>a+x.value,0)/vals.length,maxv=Math.max(...vals.map(x=>x.value));
@@ -538,12 +630,14 @@ function interviewText(){const x=state.interview||{},parts=[];
 function interviewReportBlock(){if(!state.interview?.includeInReport||!interviewHasContent())return '';const x=state.interview;return `<section class="report-section"><h1>5. REGISTRO DE ENTREVISTA Y DATOS ADICIONALES</h1><table class="report-meta"><tr><th>Fecha</th><td>${esc(x.date||'')}</td><th>Hora</th><td>${esc(x.time||'')}</td></tr><tr><th>Lugar / modalidad</th><td>${esc(x.place||'')}</td><th>Área o servicio</th><td>${esc(x.area||'')}</td></tr><tr><th>Personas entrevistadas</th><td colspan="3">${esc(x.interviewees||'')}</td></tr><tr><th>Equipo auditor</th><td colspan="3">${esc(x.auditors||'')}</td></tr></table>${x.summary?`<h2>Síntesis de la entrevista</h2><div class="interview-report-text">${esc(x.summary)}</div>`:''}${x.documents?`<h2>Documentación o evidencia mencionada</h2><div class="interview-report-text">${esc(x.documents)}</div>`:''}${x.commitments?`<h2>Compromisos asumidos</h2><div class="interview-report-text">${esc(x.commitments)}</div>`:''}${x.additional?`<h2>Datos adicionales</h2><div class="interview-report-text">${esc(x.additional)}</div>`:''}${x.auditorNotes?`<h2>Observaciones del auditor</h2><div class="interview-report-text">${esc(x.auditorNotes)}</div>`:''}</section>`}
 function copyInterview(){const t=interviewText();if(!t){alert('No hay datos de entrevista para copiar.');return}navigator.clipboard?.writeText(t).then(()=>alert('Registro de entrevista copiado.')).catch(()=>prompt('Copie el registro:',t))}
 function clearInterview(){if(!confirm('¿Limpiar todos los datos de entrevista y comentarios adicionales?'))return;state.interview=defaultInterview();save();bindInterview();renderReport()}
-// Estructura por profesión: cada solapa profesional define sus propias guías.
-// Para incorporar Laboratorio más adelante, se agregará como una nueva área sin mezclar sus datos con Enfermería.
+// Estructura por profesión. Cada solapa conserva sus datos operativos separados,
+// mientras Panel general, Tablero ejecutivo y Mapa prestacional pueden consolidarlos.
 const PROFESSIONAL_AREAS={
- "Área Enfermería":["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"]
+ "Área Enfermería":["Enfermería","Esterilización","Lavadero","Limpieza","Hemodinamia"],
+ "Laboratorio":["Laboratorio"]
 };
 const services=PROFESSIONAL_AREAS["Área Enfermería"];
+const allServices=[...new Set(Object.values(PROFESSIONAL_AREAS).flat())];
 let currentService=services[0];
 function renderAudit(){
  if(!services.includes(currentService))currentService=services[0];
@@ -576,7 +670,69 @@ function renderAudit(){
  $("#auditList").innerHTML=rhBlock+normalCards||'<div class="notice">No hay requisitos aplicables con los filtros seleccionados.</div>';
  refreshVisiblePhotoCounts();
 }
-function setResp(code,r){state.answers[code]={...answerFor(code),response:r};markDirty();renderAudit()}
+
+const LAB_DAYS=[['lunes','Lunes'],['martes','Martes'],['miercoles','Miércoles'],['jueves','Jueves'],['viernes','Viernes'],['sabado','Sábado'],['domingo','Domingo']];
+function labItems(){return ITEMS.filter(i=>i.service==='Laboratorio'&&state.enabled['Laboratorio']!==false&&applicable(i))}
+function labDeviations(){return labItems().filter(i=>answerFor(i.code).response==='NO')}
+function labStats(){
+ const active=labItems(),answered=active.filter(i=>['SI','NO','NA'].includes(answerFor(i.code).response)),evaluated=active.filter(i=>['SI','NO'].includes(answerFor(i.code).response)),yes=evaluated.filter(i=>answerFor(i.code).response==='SI').length,dev=labDeviations();
+ return {active:active.length,answered:answered.length,evaluated:evaluated.length,dev:dev.length,high:dev.filter(i=>i.score>=4).length,mod:dev.filter(i=>i.score===3).length,low:dev.filter(i=>i.score<=2).length,compliance:evaluated.length?yes/evaluated.length:0};
+}
+function labIIRS(){return iirsForItems(labItems(),answerFor)}
+function labHistoricalText(i){return i.historicalFrequency==null?'Sin frecuencia histórica asociada':`${Number(i.historicalFrequency).toFixed(1).replace('.',',')} % (${i.historicalCount}/46)`}
+function labCriticalityText(i){const p=i.processCriticality||i.criticality||'',sp=i.patientCriticality||i.criticality||'';return p===sp?p:`Proceso: ${p||'—'} · Paciente: ${sp||'—'}`}
+function renderLabAudit(){
+ const q=(document.getElementById('labSearch')?.value||'').toLowerCase(),filter=document.getElementById('labDomainFilter'),dom=filter?.value||'';
+ const all=labItems(),domains=[...new Set(all.map(i=>i.domain))];
+ if(filter)filter.innerHTML='<option value="">Todos los dominios</option>'+domains.map(x=>`<option ${x===dom?'selected':''}>${esc(x)}</option>`).join('');
+ const arr=all.filter(i=>(!q||(`${i.code} ${i.item} ${i.domain} ${i.process||''} ${i.subprocess||''}`).toLowerCase().includes(q))&&(!dom||i.domain===dom));
+ const st=labStats(),idx=labIIRS(),k=document.getElementById('labKpis');
+ if(k)k.innerHTML=[['Requisitos aplicables',st.active],['Evaluados',st.evaluated],['Desvíos',st.dev],['Altos/críticos',st.high],['Cumplimiento',(st.compliance*100).toFixed(1)+'%'],['IIRS',idx.value==null?'—':idx.value.toFixed(2)]].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+ const host=document.getElementById('labAuditList');if(!host)return;
+ host.innerHTML=arr.map(i=>{const a=answerFor(i.code),tech=technicalFor(i),hist=i.historicalFrequency==null?'':` · Histórico 2025: <b>${labHistoricalText(i)}</b>`;return `<div class="card audit-card ${String(a.response||'').toLowerCase().replace(/ /g,'-')}">
+  <div class="audit-head"><div><div class="itemtitle">${esc(i.code)} · ${esc(i.item)}</div><div class="meta">${esc(i.process||'APOYO')} · ${esc(i.domain)} · Fuente ${esc(i.sourceRef||'Guía')} · <span class="badge b${i.score}">${esc(i.criticality||riskLabel(i.score))} · ${i.score}</span>${hist}</div></div></div>
+  ${i.contextNote?`<div class="notice"><b>Condición de aplicación:</b> ${esc(i.contextNote)}</div>`:''}
+  <div class="responses">${['SI','NO','NA','NO EVALUADO'].map(r=>`<button class="resp ${a.response===r?'sel':''}" onclick="setResp('${i.code}','${r}')">${r==='NA'?'NO APLICA':r}</button>`).join('')}</div>
+  <label>Observación y evidencia</label><textarea oninput="setObs('${i.code}',this.value)" placeholder="Describa lo observado, documentos revisados, registros, entrevistas y evidencia directa...">${esc(a.obs)}</textarea>
+  <div class="photo-tools no-print"><label class="secondary photo-button">📷 Tomar foto<input class="hide" type="file" accept="image/*" capture="environment" onchange="addEvidencePhotos('${i.code}',this.files)"></label><label class="secondary photo-button">🖼 Elegir fotos<input class="hide" type="file" accept="image/*" multiple onchange="addEvidencePhotos('${i.code}',this.files)"></label><button class="secondary" onclick="openEvidenceGallery('${i.code}')">Ver fotos <span id="photo-count-${i.code}">0</span></button></div><div id="photo-preview-${i.code}" class="photo-preview"></div>
+  ${a.response==='NO'?`<div class="detail"><h4>Desvío</h4><div>${esc(tech.deviation)}</div><h4>Fundamentación técnica</h4><div>${esc(tech.why)}</div><h4>Criticidad de referencia</h4><div>${esc(labCriticalityText(i))}${i.historicalFrequency!=null?` · Frecuencia histórica 2025: ${esc(labHistoricalText(i))}`:''}</div><h4>Recomendación</h4><div>${esc(tech.rec)}</div><h4>Evidencia esperada</h4><div>${esc(tech.ev)}</div><h4>Responsable</h4><div>${esc(tech.resp)}</div><h4>Plazo</h4><div>${esc(tech.plazo)}</div></div>`:''}
+ </div>`}).join('')||'<div class="notice">No hay requisitos de Laboratorio con los filtros seleccionados.</div>';
+ refreshVisiblePhotoCounts();
+}
+function updateLabProfileField(key,value){state.labProfile[key]=value;markDirty()}
+function updateLabSchedule(kind,day,value){state.labProfile[kind]=state.labProfile[kind]||defaultWeekSchedule();state.labProfile[kind][day]=value;markDirty()}
+function updateLabEquipment(name,key,value){state.labProfile.equipment=state.labProfile.equipment||defaultLabEquipment();state.labProfile.equipment[name]=state.labProfile.equipment[name]||{qty:0,obs:''};state.labProfile.equipment[name][key]=key==='qty'?Number(value||0):value;markDirty()}
+function bindLabProfile(){
+ ensureState();const p=state.labProfile||defaultLabProfile();
+ document.querySelectorAll('[data-lab]').forEach(el=>{const k=el.dataset.lab;if(el.type==='checkbox')el.checked=!!p[k];else el.value=p[k]??'';if(!el.dataset.bound){const fn=()=>updateLabProfileField(k,el.type==='checkbox'?el.checked:(el.type==='number'?Number(el.value||0):el.value));el.addEventListener('input',fn);el.addEventListener('change',fn);el.dataset.bound='1'}});
+ const meta=document.getElementById('labMetaSummary');if(meta)meta.innerHTML=`<b>Prestador:</b> ${esc(state.meta.prestador||'Sin identificar')} · <b>Fecha:</b> ${esc(state.meta.date||'')} · <b>Jurisdicción:</b> ${esc(state.meta.province||'')} · <b>Nivel:</b> ${esc(state.meta.level||'')} · <b>Auditor:</b> ${esc(state.meta.auditor||'')}`;
+ const sch=document.getElementById('labBiochemSchedule');if(sch)sch.innerHTML=LAB_DAYS.map(([k,l])=>`<div><label>${l}</label><input value="${esc(p.biochemSchedule?.[k]||'')}" placeholder="Ej.: 08:00 a 20:00" oninput="updateLabSchedule('biochemSchedule','${k}',this.value)"></div>`).join('');
+ const op=document.getElementById('labOperationSchedule');if(op)op.innerHTML=LAB_DAYS.map(([k,l])=>`<div><label>${l}</label><input value="${esc(p.operationSchedule?.[k]||'')}" placeholder="Horario de funcionamiento" oninput="updateLabSchedule('operationSchedule','${k}',this.value)"></div>`).join('');
+ const eq=document.getElementById('labEquipmentRows');if(eq)eq.innerHTML=Object.entries(p.equipment||defaultLabEquipment()).map(([name,v])=>`<tr><td>${esc(name)}</td><td><input type="number" min="0" value="${Number(v.qty||0)}" oninput="updateLabEquipment('${name.replace(/'/g,"\\'")}','qty',this.value)"></td><td><input value="${esc(v.obs||'')}" oninput="updateLabEquipment('${name.replace(/'/g,"\\'")}','obs',this.value)"></td></tr>`).join('');
+}
+function bindLabInterview(){ensureState();document.querySelectorAll('[data-lab-interview]').forEach(el=>{const k=el.dataset.labInterview;if(el.type==='checkbox')el.checked=!!state.labInterview[k];else el.value=state.labInterview[k]||'';if(!el.dataset.bound){const fn=()=>{state.labInterview[k]=el.type==='checkbox'?el.checked:el.value;markDirty();const n=document.getElementById('labInterviewSaved');if(n)n.textContent='Cambios pendientes · se autoguardarán cada 10 minutos'};el.addEventListener('input',fn);el.addEventListener('change',fn);el.dataset.bound='1'}})}
+function labInterviewHasContent(){const x=state.labInterview||{};return ['place','interviewees','auditors','summary','documents','commitments','additional','auditorNotes'].some(k=>String(x[k]||'').trim())}
+function labInterviewText(){const x=state.labInterview||{},parts=[];if(x.date||x.time)parts.push(`Fecha y hora: ${x.date||'Sin informar'}${x.time?' · '+x.time:''}`);if(x.place)parts.push(`Lugar / modalidad: ${x.place}`);if(x.interviewees)parts.push(`Personas entrevistadas: ${x.interviewees}`);if(x.auditors)parts.push(`Equipo auditor: ${x.auditors}`);if(x.summary)parts.push(`Síntesis: ${x.summary}`);if(x.documents)parts.push(`Documentación/evidencia: ${x.documents}`);if(x.commitments)parts.push(`Compromisos: ${x.commitments}`);if(x.additional)parts.push(`Datos adicionales: ${x.additional}`);if(x.auditorNotes)parts.push(`Observaciones del auditor: ${x.auditorNotes}`);return parts.join('\n\n')}
+function copyLabInterview(){const t=labInterviewText();if(!t)return alert('No hay datos de entrevista para copiar.');navigator.clipboard?.writeText(t).then(()=>alert('Registro de Laboratorio copiado.')).catch(()=>prompt('Copie el registro:',t))}
+function clearLabInterview(){if(!confirm('¿Limpiar la entrevista de Laboratorio?'))return;state.labInterview=defaultLabInterview();save();bindLabInterview()}
+function labInterviewReportBlock(){if(!state.labInterview?.includeInReport||!labInterviewHasContent())return '';const x=state.labInterview;return `<section class="report-section"><h1>5. REGISTRO DE ENTREVISTA - LABORATORIO</h1><table class="report-meta"><tr><th>Fecha</th><td>${esc(x.date||'')}</td><th>Hora</th><td>${esc(x.time||'')}</td></tr><tr><th>Lugar / modalidad</th><td>${esc(x.place||'')}</td><th>Área</th><td>Laboratorio</td></tr><tr><th>Personas entrevistadas</th><td colspan="3">${esc(x.interviewees||'')}</td></tr><tr><th>Equipo auditor</th><td colspan="3">${esc(x.auditors||'')}</td></tr></table>${x.summary?`<h2>Síntesis</h2><div class="interview-report-text">${esc(x.summary)}</div>`:''}${x.documents?`<h2>Documentación o evidencia</h2><div class="interview-report-text">${esc(x.documents)}</div>`:''}${x.commitments?`<h2>Compromisos asumidos</h2><div class="interview-report-text">${esc(x.commitments)}</div>`:''}${x.additional?`<h2>Datos adicionales</h2><div class="interview-report-text">${esc(x.additional)}</div>`:''}${x.auditorNotes?`<h2>Observaciones del auditor</h2><div class="interview-report-text">${esc(x.auditorNotes)}</div>`:''}</section>`}
+function renderLabDevs(){const body=document.getElementById('labDevRows');if(!body)return;const ds=labDeviations().sort((a,b)=>b.score-a.score);body.innerHTML=ds.length?ds.map(i=>{const a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${esc(i.code)}</td><td>${esc(i.process||'APOYO')}</td><td>${esc(i.domain)}</td><td>${esc(t.deviation)}</td><td>${esc(a.obs||'')}</td><td>${esc(labCriticalityText(i))}</td><td>${esc(labHistoricalText(i))}</td><td>${esc(t.rec)}</td><td>${esc(t.resp)}</td><td>${esc(t.plazo)}</td></tr>`}).join(''):'<tr><td colspan="10">No hay desvíos de Laboratorio cargados.</td></tr>'}
+function renderLabPlan(){const body=document.getElementById('labPlanRows');if(!body)return;const ds=labDeviations().sort((a,b)=>b.score-a.score);body.innerHTML=ds.length?ds.map(i=>{const a=answerFor(i.code),t=technicalFor(i);return `<tr><td>${esc(i.code)}</td><td>${esc(i.process||'APOYO')}</td><td>${esc(t.deviation)}</td><td>${esc(t.rec)}</td><td>${esc(t.ev)}</td><td>${esc(t.resp)}</td><td>${esc(t.plazo)}</td><td><select onchange="setStatus('${i.code}',this.value)">${['PENDIENTE','EN PROCESO','CUMPLIDO','VERIFICADO'].map(x=>`<option ${a.status===x?'selected':''}>${x}</option>`).join('')}</select></td></tr>`}).join(''):'<tr><td colspan="8">No hay desvíos. El plan se genera automáticamente a partir de las respuestas NO.</td></tr>'}
+function labProcessMetrics(process){const arr=labItems().filter(i=>(i.process||'APOYO')===process),evals=arr.filter(i=>['SI','NO'].includes(answerFor(i.code).response)),devs=evals.filter(i=>answerFor(i.code).response==='NO'),yes=evals.filter(i=>answerFor(i.code).response==='SI').length,idx=iirsForItems(arr,answerFor);return {process,evaluated:evals.length,deviations:devs.length,high:devs.filter(i=>i.score>=4).length,compliance:evals.length?yes/evals.length:0,index:idx}}
+function labExecutiveText(){const s=labStats(),idx=labIIRS(),ds=labDeviations();if(!s.evaluated)return 'Laboratorio todavía no cuenta con requisitos evaluados suficientes para emitir un resumen.';const processes=['PREANALÍTICO','ANALÍTICO','POSTANALÍTICO','APOYO'].map(labProcessMetrics).filter(x=>x.evaluated);const affected=processes.filter(x=>x.deviations).sort((a,b)=>b.index.value-a.index.value).map(x=>x.process);return `La auditoría del Área Laboratorio evaluó ${s.evaluated} requisitos, con un cumplimiento del ${(s.compliance*100).toFixed(1).replace('.',',')} %. Se identificaron ${s.dev} desvíos, de los cuales ${s.high} son altos o críticos. El IIRS del área es ${idx.value==null?'sin datos':idx.value.toFixed(2)}${idx.band?` (${idx.band.label})`:''}.${affected.length?` Los procesos con desvíos se concentran en ${affected.join(', ')}.`:''}`}
+function labActSummary(){const ds=labDeviations().sort((a,b)=>b.score-a.score);if(!ds.length)return 'No se registran desvíos de Laboratorio conforme a las respuestas cargadas.';return ds.map(i=>`${i.code}: ${technicalFor(i).deviation}${answerFor(i.code).obs?' Observación: '+answerFor(i.code).obs:''}`).join(' ')}
+function renderLabSummary(){const s=labStats(),idx=labIIRS();const k=document.getElementById('labSummaryKpis');if(k)k.innerHTML=[['Evaluados',s.evaluated],['Desvíos',s.dev],['Altos/críticos',s.high],['Cumplimiento',(s.compliance*100).toFixed(1)+'%'],['IIRS',idx.value==null?'—':idx.value.toFixed(2)]].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');const e=document.getElementById('labExecText');if(e)e.textContent=labExecutiveText();const a=document.getElementById('labActText');if(a)a.textContent=labActSummary();const body=document.getElementById('labProcessRows');if(body)body.innerHTML=['PREANALÍTICO','ANALÍTICO','POSTANALÍTICO','APOYO'].map(labProcessMetrics).filter(x=>x.evaluated).map(x=>`<tr><td>${x.process}</td><td>${x.evaluated}</td><td>${x.deviations}</td><td>${x.high}</td><td>${(x.compliance*100).toFixed(1)}%</td><td>${iirsBadge(x.index)}</td></tr>`).join('')||'<tr><td colspan="6">Sin datos suficientes.</td></tr>'}
+function renderLabNorms(){const body=document.getElementById('labNormRows');if(!body)return;body.innerHTML=NORMS.filter(n=>n.service==='Laboratorio').map(n=>`<tr><td>${esc(n.scope)}</td><td>${esc(n.number)}</td><td>${esc(n.regulation)}</td><td>${esc(n.authority)}</td><td>${esc(n.status)}</td></tr>`).join('')}
+function labScheduleText(schedule){return LAB_DAYS.map(([k,l])=>schedule?.[k]?`${l}: ${schedule[k]}`:'').filter(Boolean).join(' · ')||'No informado'}
+function labProfileReportBlock(){const p=state.labProfile||defaultLabProfile(),eq=Object.entries(p.equipment||{}).filter(([,v])=>Number(v.qty)>0||String(v.obs||'').trim());return `<section class="report-section"><h1>2. CARACTERIZACIÓN DEL SERVICIO</h1><table class="report-meta"><tr><th>Dirección Técnica</th><td>${esc(p.directorName||'No informado')}</td><th>Matrícula</th><td>${esc(p.directorLicense||'No informada')}</td></tr><tr><th>Especialidad</th><td>${esc(p.directorSpecialty||'No informada')}</td><th>Modalidad</th><td>${esc(p.ownership||'No informada')} / ${esc(p.locationType||'')}</td></tr><tr><th>Bioquímicos</th><td>${Number(p.biochemists||0)}</td><th>Técnicos</th><td>${Number(p.technicians||0)}</td></tr><tr><th>Administrativos</th><td>${Number(p.administrative||0)}</td><th>Limpieza</th><td>${Number(p.cleaningStaff||0)}</td></tr><tr><th>Pacientes/día</th><td>${Number(p.avgPatients||0)}</td><th>Informes</th><td>${p.reportPaper?'Papel ':''}${p.reportElectronic?'Electrónico':''}</td></tr><tr><th>Guardia</th><td>${esc(p.guardType||'No informada')}</td><th>Cobertura</th><td>${esc(p.guardBiochemist||'No informada')}</td></tr><tr><th>Horario bioquímicos</th><td colspan="3">${esc(labScheduleText(p.biochemSchedule))}</td></tr><tr><th>Funcionamiento</th><td colspan="3">${esc(labScheduleText(p.operationSchedule))}</td></tr></table>${eq.length?`<h2>Equipamiento declarado</h2><table><tr><th>Equipo</th><th>Cantidad</th><th>Observaciones</th></tr>${eq.map(([n,v])=>`<tr><td>${esc(n)}</td><td>${Number(v.qty||0)}</td><td>${esc(v.obs||'')}</td></tr>`).join('')}</table>`:''}${p.otherEquipment?`<p><b>Otros equipos:</b> ${esc(p.otherEquipment)}</p>`:''}</section>`}
+function labTechnicalAnnex(){const ds=labDeviations().sort((a,b)=>b.score-a.score);if(!ds.length)return '<p>No se registraron desvíos de Laboratorio.</p>';return ds.map(i=>{const t=technicalFor(i),a=answerFor(i.code);return `<div class="deviation-block"><h4>${esc(i.code)} · ${esc(t.deviation)}</h4><p><b>Proceso:</b> ${esc(i.process||'APOYO')} · <b>Dominio:</b> ${esc(i.domain)}</p>${a.obs?`<p><b>Observación y evidencia:</b> ${esc(a.obs)}</p>`:''}<p><b>Fundamentación técnica:</b> ${esc(t.why)}</p><p><b>Criticidad:</b> ${esc(labCriticalityText(i))} · Riesgo SIAPE ${i.score}/5</p>${i.historicalFrequency!=null?`<p><b>Antecedente auditorías 2025:</b> ${esc(labHistoricalText(i))}. La frecuencia histórica se utiliza como contexto y no modifica automáticamente el IIRS actual.</p>`:''}<p><b>Recomendación:</b> ${esc(t.rec)}</p><p><b>Evidencia esperada:</b> ${esc(t.ev)}</p><p><b>Responsable:</b> ${esc(t.resp)}</p><p><b>Plazo:</b> ${esc(t.plazo)}</p></div>`}).join('')}
+function labProcessReportTable(){const rows=['PREANALÍTICO','ANALÍTICO','POSTANALÍTICO','APOYO'].map(labProcessMetrics).filter(x=>x.evaluated);return rows.length?`<table><tr><th>Proceso</th><th>Evaluados</th><th>Desvíos</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS</th></tr>${rows.map(x=>`<tr><td>${x.process}</td><td>${x.evaluated}</td><td>${x.deviations}</td><td>${x.high}</td><td>${(x.compliance*100).toFixed(1)}%</td><td>${x.index.value==null?'—':x.index.value.toFixed(2)}</td></tr>`).join('')}</table>`:'<p>Sin datos por proceso.</p>'}
+function renderLabReport(){const s=labStats(),idx=labIIRS(),meta=state.meta;const norms=NORMS.filter(n=>n.service==='Laboratorio');const host=document.getElementById('labReportContent');if(!host)return;host.innerHTML=`<div class="report"><section class="cover"><h1>INFORME EJECUTIVO N° ${esc(reportId())}</h1><h2>AUDITORÍA PRESTACIONAL · LABORATORIO</h2><div class="institution">INSSJP · GERENCIA DE AUDITORÍA PRESTACIONAL</div><div class="provider">${esc(meta.prestador||'PRESTADOR')}</div></section><section class="report-section"><h1>1. DATOS DEL PRESTADOR Y DE LA AUDITORÍA</h1><table class="report-meta"><tr><th>Informe</th><td>${esc(reportId())}</td><th>Fecha</th><td>${esc(meta.date||'')}</td></tr><tr><th>Prestador</th><td>${esc(meta.prestador||'')}</td><th>CUIT</th><td>${esc(meta.cuit||'')}</td></tr><tr><th>Domicilio</th><td>${esc(meta.address||'')}</td><th>Jurisdicción</th><td>${esc(meta.province||'')}</td></tr><tr><th>Nivel</th><td>${esc(meta.level||'')}</td><th>Auditor</th><td>${esc(meta.auditor||'')}</td></tr></table></section>${labProfileReportBlock()}<section class="report-section"><h1>3. RESUMEN EJECUTIVO</h1><p>${esc(labExecutiveText())}</p><table><tr><th>Requisitos aplicables</th><th>Evaluados</th><th>Desvíos</th><th>Altos/críticos</th><th>Cumplimiento</th><th>IIRS</th></tr><tr><td>${s.active}</td><td>${s.evaluated}</td><td>${s.dev}</td><td>${s.high}</td><td>${(s.compliance*100).toFixed(1)}%</td><td>${idx.value==null?'—':idx.value.toFixed(2)}</td></tr></table><h2>Análisis por proceso</h2>${labProcessReportTable()}</section><section class="report-section"><h1>4. OBJETO Y ALCANCE</h1><p>Verificar la estructura, recursos humanos, funcionalidad, capacidad resolutiva, fases preanalítica, analítica y postanalítica, aseguramiento de la calidad, trazabilidad, equipamiento, mantenimiento y bioseguridad del Laboratorio conforme a la guía y evidencia disponible durante la auditoría.</p></section>${labInterviewReportBlock()}<section class="report-section"><h1>6. SÍNTESIS PARA EL ACTA</h1><div class="summary-text">${esc(labActSummary())}</div></section><section class="report-section"><h1>7. REFERENCIAS TÉCNICAS</h1>${norms.map(n=>`<h3>${esc(n.number)}</h3><p>${esc(n.regulation)} · ${esc(n.status)}</p>`).join('')}<p class="small">Las referencias deben validarse documentalmente antes de utilizarse como fundamento legal directo.</p></section><section class="report-section"><h1>8. ANEXO TÉCNICO OPERATIVO - DESVÍOS DE LABORATORIO</h1>${labTechnicalAnnex()}</section><div class="signature">Firma del auditor</div></div>`}
+async function prepareLabReportWithPhotos(){renderLabReport();const blocks=[];for(const i of labDeviations()){const ps=await getEvidencePhotos(i.code);if(ps.length)blocks.push(`<section class="report-section photo-report"><h1>EVIDENCIA FOTOGRÁFICA · ${esc(i.code)}</h1><p><b>Laboratorio:</b> ${esc(i.item)}</p><div class="report-photo-grid">${ps.map((p,n)=>`<figure><img src="${URL.createObjectURL(p.blob)}"><figcaption>Fotografía ${n+1} · ${new Date(p.createdAt).toLocaleString()}</figcaption></figure>`).join('')}</div></section>`)}document.getElementById('labReportContent').insertAdjacentHTML('beforeend',blocks.join(''));alert(blocks.length?'Informe de Laboratorio preparado con fotografías.':'No hay fotografías cargadas en los desvíos de Laboratorio.')}
+function labShareText(){const s=labStats(),idx=labIIRS();return `SIAPE · Laboratorio · Informe ${reportId()}\nPrestador: ${state.meta.prestador||'Sin identificar'}\nFecha: ${state.meta.date||''}\nAuditor: ${state.meta.auditor||''}\nDesvíos: ${s.dev}\nIIRS Laboratorio: ${idx.value==null?'Sin datos':idx.value.toFixed(2)}`}
+async function shareLabReport(){const text=labShareText();if(navigator.share){try{await navigator.share({title:`SIAPE · Laboratorio · Informe ${reportId()}`,text});return}catch(e){if(e.name==='AbortError')return}}const action=prompt('Escriba una opción: CORREO, WHATSAPP o CANCELAR','CORREO');if(!action)return;const a=action.toUpperCase();if(a.startsWith('CORREO')){const to=prompt('Correo destinatario:','')||'';location.href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent('SIAPE · Laboratorio · Informe '+reportId())}&body=${encodeURIComponent(text+'\n\nAdjunte el informe generado desde SIAPE.')}`}else if(a.startsWith('WHATS'))window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank')}
+
+function setResp(code,r){state.answers[code]={...answerFor(code),response:r};markDirty();if(String(code).startsWith('LAB-'))renderLabAudit();else renderAudit()}
 function setObs(code,v){state.answers[code]={...answerFor(code),obs:v};markDirty()}
 function normText(service){
  const national=NORMS.filter(n=>n.service===service&&n.jurisdiction==="Nación");
@@ -599,20 +755,16 @@ function normText(service){
  return parts.join(" ");
 }
 function renderDashboard(){
- let s=stats(),general=currentIIRS();
- const pooledActive=s.active, pooledYes=Math.round(s.compliance*s.active), pooledDev=s.dev;
- const pooledCompliance=pooledActive?pooledYes/pooledActive:0;
- const pooledIirs=general.value||0;
- $("#kpis").innerHTML=[
-  ["Ítems aplicables",pooledActive],["Respondidos",s.answered],["Desvíos",pooledDev],["Riesgo alto",s.high],["Cumplimiento",(pooledCompliance*100).toFixed(1)+"%"],["IIRS general",Number(pooledIirs).toFixed(2)]
- ].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
- $("#overall").innerHTML=`Resultado consolidado del prestador<div class="iirs-overall">IIRS consolidado preliminar: <b>${Number(pooledIirs).toFixed(2)}</b> · Cumplimiento total: <b>${(pooledCompliance*100).toFixed(1)}%</b></div><div class="small">El consolidado pondera todos los requisitos efectivamente aplicables de las áreas cargadas; los NO APLICA no intervienen.</div>`;
- let rows=services.filter(x=>state.enabled[x]).map(sv=>{
-  let arr=activeItems().filter(i=>i.service===sv), ds=arr.filter(i=>answerFor(i.code).response==="NO");
-  let ans=arr.filter(i=>["SI","NO"].includes(answerFor(i.code).response)), yes=ans.filter(i=>answerFor(i.code).response==="SI").length,idx=currentIIRS(sv);
-  return `<tr><td>${sv}</td><td>${arr.length}</td><td>${ds.length}</td><td>${ans.length?(yes/ans.length*100).toFixed(1):"0.0"}%</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${iirsBadge(idx)}</td></tr>`
- });
- $("#serviceTable").innerHTML=rows.join("");
+ const globalItems=ITEMS.filter(i=>allServices.includes(i.service)&&state.enabled[i.service]!==false&&applicable(i));
+ const evaluated=globalItems.filter(i=>['SI','NO'].includes(answerFor(i.code).response)),answered=globalItems.filter(i=>['SI','NO','NA'].includes(answerFor(i.code).response)),devs=evaluated.filter(i=>answerFor(i.code).response==='NO'),yes=evaluated.filter(i=>answerFor(i.code).response==='SI').length;
+ const compliance=evaluated.length?yes/evaluated.length:0,general=iirsForItems(globalItems,answerFor);
+ $('#kpis').innerHTML=[['Ítems aplicables',globalItems.length],['Respondidos',answered.length],['Desvíos',devs.length],['Riesgo alto',devs.filter(i=>i.score>=4).length],['Cumplimiento',(compliance*100).toFixed(1)+'%'],['IIRS general',general.value==null?'—':general.value.toFixed(2)]].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+ $('#overall').innerHTML=`Resultado consolidado del prestador<div class="iirs-overall">IIRS consolidado: <b>${general.value==null?'—':general.value.toFixed(2)}</b> · Cumplimiento total: <b>${(compliance*100).toFixed(1)}%</b></div><div class="small">Integra Enfermería, Esterilización, Lavadero, Limpieza, Hemodinamia y Laboratorio según los requisitos efectivamente evaluados. Los NO APLICA y los no evaluados no intervienen.</div>`;
+ const rows=allServices.map(sv=>{
+  const arr=globalItems.filter(i=>i.service===sv),ans=arr.filter(i=>['SI','NO'].includes(answerFor(i.code).response));if(!ans.length)return null;const ds=ans.filter(i=>answerFor(i.code).response==='NO'),ok=ans.filter(i=>answerFor(i.code).response==='SI').length,idx=iirsForItems(arr,answerFor);
+  return `<tr><td>${esc(sv)}</td><td>${arr.length}</td><td>${ds.length}</td><td>${(ok/ans.length*100).toFixed(1)}%</td><td>${ds.filter(i=>i.score<=2).length}</td><td>${ds.filter(i=>i.score===3).length}</td><td>${ds.filter(i=>i.score>=4).length}</td><td>${iirsBadge(idx)}</td></tr>`
+ }).filter(Boolean);
+ $('#serviceTable').innerHTML=rows.join('')||'<tr><td colspan="8">Todavía no hay áreas evaluadas.</td></tr>';
  renderProviderRanking();
 }
 function renderSummary(){
@@ -753,6 +905,14 @@ function renderAll(){
 }
 function renderPageOnDemand(id){
  if(id==='auditPage')renderAudit();
+ else if(id==='labPage')renderLabAudit();
+ else if(id==='labDataPage')bindLabProfile();
+ else if(id==='labInterviewPage')bindLabInterview();
+ else if(id==='labDevPage')renderLabDevs();
+ else if(id==='labPlanPage')renderLabPlan();
+ else if(id==='labSummaryPage')renderLabSummary();
+ else if(id==='labNormPage')renderLabNorms();
+ else if(id==='labReportPage')renderLabReport();
  else if(id==='interviewPage')bindInterview();
  else if(id==='rrhhPage'){bindRH();renderRH();}
  else if(id==='dashPage'){renderDashboard();renderProviderRanking();}
@@ -771,7 +931,7 @@ function openRHCalculator(){try{const btn=document.getElementById('auditNav');sh
 function copyText(id){navigator.clipboard.writeText($("#"+id).textContent);alert("Texto copiado")}
 function exportJSON(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="SIAPE_Informe_"+(state.meta.reportNumber||"SN")+"_"+(state.meta.reportYear||"SA")+"_"+(state.meta.prestador||"prestador")+".json";a.click()}
 function importJSON(e){let f=e.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);ensureState();save();renderAll();alert("Auditoría importada")}catch{alert("Archivo no válido")}};r.readAsText(f)}
-function resetAudit(){if(confirm("¿Crear una nueva auditoría? La auditoría actual seguirá disponible solo si fue guardada con el botón 💾 o exportada.")){state={meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},answers:{},enabled:Object.fromEntries(services.map(x=>[x,true])),interview:defaultInterview(),rh:defaultRH()};save();renderAll()}}
+function resetAudit(){if(confirm("¿Crear una nueva auditoría? La auditoría actual seguirá disponible solo si fue guardada con el botón 💾 o exportada.")){state={meta:{reportNumber:"",reportYear:String(new Date().getFullYear()),prestador:"",cuit:"",province:"CABA",level:"III",type:"Privado",date:new Date().toISOString().slice(0,10),auditor:"",address:""},answers:{},enabled:Object.fromEntries(allServices.map(x=>[x,true])),interview:defaultInterview(),labProfile:defaultLabProfile(),labInterview:defaultLabInterview(),rh:defaultRH()};save();renderAll()}}
 
 function defaultRH(){return {service:"Internación general",shift:"Mañana",beds:0,occupied:0,normRef:"",method:"mixto",licensed:0,nurses:0,assistants:0,supervisors:0,absence:0,evidence:"",requiredNorm:0,pMin:0,mMin:0,pMod:0,mMod:0,pEsp:0,mEsp:0,pInt:0,mInt:0,productiveMinutes:360,upeTotal:0,upePerWorker:1,result:null}}
 function ensureRH(){state.rh={...defaultRH(),...(state.rh||{})}}
@@ -1005,88 +1165,84 @@ function friendlyAuthError(e){
 }
 
 
-// ===== MAPA PRESTACIONAL DEMOSTRATIVO V3.4.1 =====
+// ===== MAPA PRESTACIONAL · V3.4.18 =====
+// Usa las auditorías guardadas en este dispositivo. Si no existen datos locales,
+// conserva una muestra ficticia para que el módulo cartográfico pueda demostrarse.
 const DEMO_PROVIDERS = [
- {id:'demo-caba-1',name:'Hospital Metropolitano de Prueba',province:'CABA',city:'Ciudad Autónoma de Buenos Aires',lat:-34.6037,lng:-58.3816,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:18450,compliance:88,iirs:1.2,lastAudit:'28/07/2026',areas:['Área Médica','Enfermería','Hemoterapia','Imágenes']},
- {id:'demo-ba-1',name:'Clínica Regional Oeste',province:'Buenos Aires',city:'Luján',lat:-34.5703,lng:-59.1050,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:9300,compliance:72,iirs:2.7,lastAudit:'22/07/2026',areas:['Área Médica','Enfermería','Esterilización','Limpieza','Lavadero']},
- {id:'demo-cordoba-1',name:'Sanatorio Central Córdoba',province:'Córdoba',city:'Córdoba',lat:-31.4201,lng:-64.1888,type:'Sanatorio',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:12680,compliance:54,iirs:4.1,lastAudit:'15/07/2026',areas:['Área Médica','Enfermería','Hemodinamia','Imágenes','Farmacia']},
- {id:'demo-santafe-1',name:'Instituto Asistencial del Litoral',province:'Santa Fe',city:'Rosario',lat:-32.9442,lng:-60.6505,type:'Instituto médico',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:11120,compliance:81,iirs:1.9,lastAudit:'09/07/2026',areas:['Área Médica','Enfermería','Nutrición']},
- {id:'demo-mendoza-1',name:'Centro Médico Andino',province:'Mendoza',city:'Mendoza',lat:-32.8895,lng:-68.8458,type:'Centro médico',complexity:'Baja complejidad',module:'Atención ambulatoria',capitas:4800,compliance:93,iirs:0.7,lastAudit:'01/07/2026',areas:['Área Médica','Enfermería','Imágenes']},
- {id:'demo-tucuman-1',name:'Clínica del Norte',province:'Tucumán',city:'San Miguel de Tucumán',lat:-26.8083,lng:-65.2176,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Módulo 69 · Internación',capitas:7600,compliance:63,iirs:3.2,lastAudit:'25/06/2026',areas:['Área Médica','Enfermería','Hemoterapia']},
- {id:'demo-neuquen-1',name:'Hospital Patagónico de Prueba',province:'Neuquén',city:'Neuquén',lat:-38.9516,lng:-68.0591,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Internación y alta complejidad',capitas:6900,compliance:null,iirs:null,lastAudit:'Sin auditoría',areas:[]}
+ {id:'demo-caba-1',name:'Hospital Metropolitano de Prueba',province:'CABA',city:'Ciudad Autónoma de Buenos Aires',lat:-34.6037,lng:-58.3816,type:'Hospital',complexity:'Alta complejidad / III Nivel',module:'Demostración',capitas:0,compliance:88,iirs:1.2,lastAudit:'28/07/2026',areas:['Enfermería','Laboratorio'],areaMetrics:[],demo:true},
+ {id:'demo-ba-1',name:'Clínica Regional Oeste',province:'Buenos Aires',city:'Luján',lat:-34.5703,lng:-59.1050,type:'Clínica privada',complexity:'Internación / II Nivel',module:'Demostración',capitas:0,compliance:72,iirs:2.7,lastAudit:'22/07/2026',areas:['Enfermería','Esterilización','Limpieza','Lavadero'],areaMetrics:[],demo:true},
+ {id:'demo-cordoba-1',name:'Sanatorio Central Córdoba',province:'Córdoba',city:'Córdoba',lat:-31.4201,lng:-64.1888,type:'Sanatorio',complexity:'Alta complejidad / III Nivel',module:'Demostración',capitas:0,compliance:54,iirs:4.1,lastAudit:'15/07/2026',areas:['Enfermería','Hemodinamia','Laboratorio'],areaMetrics:[],demo:true}
 ];
+const PROVINCE_CENTROIDS={
+ 'CABA':[-34.6037,-58.3816],'Buenos Aires':[-36.7,-60.0],'Catamarca':[-28.47,-65.78],'Chaco':[-27.45,-59.0],
+ 'Chubut':[-43.3,-65.1],'Córdoba':[-31.42,-64.19],'Corrientes':[-27.47,-58.83],'Entre Ríos':[-31.74,-60.52],
+ 'Formosa':[-26.18,-58.18],'Jujuy':[-24.19,-65.30],'La Pampa':[-36.62,-64.29],'La Rioja':[-29.41,-66.86],
+ 'Mendoza':[-32.89,-68.85],'Misiones':[-27.37,-55.90],'Neuquén':[-38.95,-68.06],'Río Negro':[-40.81,-63.0],
+ 'Salta':[-24.79,-65.41],'San Juan':[-31.54,-68.52],'San Luis':[-33.30,-66.34],'Santa Cruz':[-48.8,-69.8],
+ 'Santa Fe':[-31.63,-60.70],'Santiago del Estero':[-27.80,-64.26],'Tierra del Fuego':[-54.80,-68.30],'Tucumán':[-26.81,-65.22]
+};
 let providerMapInstance=null;
 let providerMapLayer=null;
 let malvinasLabelMarker=null;
 function providerRiskKey(p){if(p.iirs===null||p.iirs===undefined)return'gris';if(p.iirs<=2)return'verde';if(p.iirs<4)return'amarillo';return'rojo'}
 function providerRiskLabel(p){const k=providerRiskKey(p);return k==='verde'?'Verde · Buen cumplimiento':k==='amarillo'?'Amarillo · Riesgo moderado':k==='rojo'?'Rojo · Riesgo alto':'Gris · Sin auditoría'}
 function providerMarkerStyle(p){const k=providerRiskKey(p);const colors={verde:'#15803d',amarillo:'#ca8a04',rojo:'#b91c1c',gris:'#64748b'};return{radius:9,fillColor:colors[k],color:'#ffffff',weight:2,opacity:1,fillOpacity:.92}}
+function stableOffset(text){let h=0;for(const ch of String(text||''))h=(h*31+ch.charCodeAt(0))|0;const a=((h&255)-127)/900,b=(((h>>>8)&255)-127)/900;return[a,b]}
+function providerCoordinates(meta){
+ const lat=Number(meta?.lat),lng=Number(meta?.lng);if(Number.isFinite(lat)&&Number.isFinite(lng))return {lat,lng,approx:false};
+ const base=PROVINCE_CENTROIDS[meta?.province]||[-38.4,-63.6],off=stableOffset(meta?.prestador||meta?.address||'');
+ return {lat:base[0]+off[0],lng:base[1]+off[1],approx:true};
+}
+function snapshotCompliance(snap){
+ const st=snap?.state||snap||{},level=st.meta?.level||'III',enabled=st.enabled||{};
+ const arr=ITEMS.filter(i=>enabled[i.service]!==false&&String(i.levels||'').includes(level));
+ const ev=arr.filter(i=>['SI','NO'].includes(st.answers?.[i.code]?.response));if(!ev.length)return null;
+ return ev.filter(i=>st.answers?.[i.code]?.response==='SI').length/ev.length*100;
+}
+function localProvidersForMap(){
+ const lib=JSON.parse(localStorage.getItem(LIBKEY)||'{}'),latest={};
+ Object.entries(lib).forEach(([id,snap])=>{const m=snap?.state?.meta||{},name=String(m.prestador||'').trim();if(!name)return;const key=name.toLocaleLowerCase('es');if(!latest[key]||String(snap.savedAt||'')>String(latest[key].savedAt||''))latest[key]={...snap,_id:id};});
+ return Object.values(latest).map(snap=>{
+  const m=snap.state?.meta||{},idx=snapshotIIRS(snap),coords=providerCoordinates(m);
+  const areaMetrics=allServices.map(service=>{const x=snapshotIIRS(snap,service);return x.evaluated?{service,evaluated:x.evaluated,deviations:x.deviations,iirs:x.value}:null}).filter(Boolean);
+  if(idx.value==null&&!areaMetrics.length)return null;
+  return {id:snap._id,name:m.prestador||'Prestador',province:m.province||'Sin provincia',city:m.address||m.province||'',lat:coords.lat,lng:coords.lng,locationApprox:coords.approx,type:m.type||'Prestador',complexity:`Nivel ${m.level||'—'}`,module:'Auditoría SIAPE',capitas:0,compliance:snapshotCompliance(snap),iirs:idx.value,lastAudit:m.date||String(snap.savedAt||'').slice(0,10)||'—',areas:areaMetrics.map(x=>x.service),areaMetrics,demo:false};
+ }).filter(Boolean);
+}
+function mapProviderData(){const real=localProvidersForMap();return real.length?real:DEMO_PROVIDERS}
 function filteredDemoProviders(){
  const search=(document.getElementById('providerMapSearch')?.value||'').trim().toLowerCase();
  const province=document.getElementById('providerMapProvince')?.value||'';
  const complexity=document.getElementById('providerMapComplexity')?.value||'';
  const risk=document.getElementById('providerMapRisk')?.value||'';
- return DEMO_PROVIDERS.filter(p=>(!search||`${p.name} ${p.province} ${p.city}`.toLowerCase().includes(search))&&(!province||p.province===province)&&(!complexity||p.complexity===complexity)&&(!risk||providerRiskKey(p)===risk));
+ return mapProviderData().filter(p=>(!search||`${p.name} ${p.province} ${p.city}`.toLowerCase().includes(search))&&(!province||p.province===province)&&(!complexity||p.complexity===complexity)&&(!risk||providerRiskKey(p)===risk));
 }
 function renderProviderMap(){
  if(typeof L==='undefined'){document.getElementById('providerMapDetail').innerHTML='<h2>Mapa no disponible</h2><p>No se pudo cargar el componente cartográfico. Verifique la conexión a Internet.</p>';return}
- const select=document.getElementById('providerMapProvince');
- if(select&&select.options.length===1)[...new Set(DEMO_PROVIDERS.map(p=>p.province))].sort().forEach(v=>select.add(new Option(v,v)));
+ const data=mapProviderData(),select=document.getElementById('providerMapProvince');
+ if(select){const current=select.value;select.innerHTML='<option value="">Todas</option>';[...new Set(data.map(p=>p.province))].sort().forEach(v=>select.add(new Option(v,v)));if([...select.options].some(o=>o.value===current))select.value=current;}
+ const complexity=document.getElementById('providerMapComplexity');if(complexity){const current=complexity.value;complexity.innerHTML='<option value="">Todas</option>';[...new Set(data.map(p=>p.complexity).filter(Boolean))].sort().forEach(v=>complexity.add(new Option(v,v)));if([...complexity.options].some(o=>o.value===current))complexity.value=current;}
  if(!providerMapInstance){
   providerMapInstance=L.map('providerMap',{zoomControl:true,minZoom:3}).setView([-38.4,-63.6],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap'}).addTo(providerMapInstance);
   providerMapLayer=L.layerGroup().addTo(providerMapInstance);
-  // Etiqueta institucional argentina para las Islas Malvinas.
-  malvinasLabelMarker=L.marker([-51.72,-59.25],{
-   interactive:false,
-   keyboard:false,
-   zIndexOffset:1000,
-   icon:L.divIcon({
-    className:'malvinas-label-wrap',
-    html:'<div class="malvinas-label">Islas Malvinas</div><div class="malvinas-dot"></div>',
-    iconSize:[128,42],
-    iconAnchor:[64,20]
-   })
-  }).addTo(providerMapInstance);
+  malvinasLabelMarker=L.marker([-51.72,-59.25],{interactive:false,keyboard:false,zIndexOffset:1000,icon:L.divIcon({className:'malvinas-label-wrap',html:'<div class="malvinas-label">Islas Malvinas</div><div class="malvinas-dot"></div>',iconSize:[128,42],iconAnchor:[64,20]})}).addTo(providerMapInstance);
  }
- setTimeout(()=>providerMapInstance.invalidateSize(),100);
- renderProviderMapMarkers();
+ setTimeout(()=>providerMapInstance.invalidateSize(),100);renderProviderMapMarkers();
 }
 function renderProviderMapMarkers(){
- if(!providerMapInstance||!providerMapLayer)return;
- providerMapLayer.clearLayers();
- const items=filteredDemoProviders();
- items.forEach(p=>{
-  const marker=L.circleMarker([p.lat,p.lng],providerMarkerStyle(p)).addTo(providerMapLayer);
-  marker.bindTooltip(`${p.name}<br>${p.city}, ${p.province}`);
-  marker.on('click',()=>showProviderMapDetail(p));
- });
- const audited=items.filter(p=>p.iirs!==null);const totalCapitas=items.reduce((s,p)=>s+(p.capitas||0),0);const avg=audited.length?audited.reduce((s,p)=>s+p.iirs,0)/audited.length:null;
- const k=document.getElementById('providerMapKpis');if(k)k.innerHTML=[
-  `<div class="kpi"><b>${items.length}</b><span>Prestadores visibles</span></div>`,
-  `<div class="kpi"><b>${totalCapitas.toLocaleString('es-AR')}</b><span>Cápitas demostrativas</span></div>`,
-  `<div class="kpi"><b>${avg===null?'—':avg.toFixed(2)}</b><span>IIRS promedio</span></div>`,
-  `<div class="kpi"><b>${items.filter(p=>providerRiskKey(p)==='rojo').length}</b><span>Prestadores en rojo</span></div>`
- ].join('');
+ if(!providerMapInstance||!providerMapLayer)return;providerMapLayer.clearLayers();const items=filteredDemoProviders();
+ items.forEach(p=>{const marker=L.circleMarker([p.lat,p.lng],providerMarkerStyle(p)).addTo(providerMapLayer);marker.bindTooltip(`${p.name}<br>${p.city||p.province}, ${p.province}${p.locationApprox?'<br><small>Ubicación aproximada</small>':''}`);marker.on('click',()=>showProviderMapDetail(p));});
+ const audited=items.filter(p=>p.iirs!==null&&p.iirs!==undefined),avg=audited.length?audited.reduce((sum,p)=>sum+p.iirs,0)/audited.length:null,totalDevs=items.reduce((sum,p)=>sum+(p.areaMetrics||[]).reduce((a,x)=>a+x.deviations,0),0),isDemo=items.length&&items.every(p=>p.demo);
+ const k=document.getElementById('providerMapKpis');if(k)k.innerHTML=[`<div class="kpi"><b>${items.length}</b><span>Prestadores visibles</span></div>`,`<div class="kpi"><b>${totalDevs}</b><span>Desvíos visibles</span></div>`,`<div class="kpi"><b>${avg===null?'—':avg.toFixed(2)}</b><span>IIRS promedio</span></div>`,`<div class="kpi"><b>${items.filter(p=>providerRiskKey(p)==='rojo').length}</b><span>Prestadores en rojo</span></div>`].join('');
+ const note=document.getElementById('providerMapSourceNote');if(note)note.innerHTML=isDemo?'<b>Modo demostrativo.</b> No hay auditorías guardadas con datos evaluados en este dispositivo; se muestran prestadores ficticios para visualizar el funcionamiento del mapa.':'<b>Datos reales locales.</b> El mapa utiliza la auditoría guardada más reciente de cada prestador en este dispositivo. Enfermería, Esterilización, Hemodinamia, Limpieza, Lavadero y Laboratorio se consolidan únicamente cuando fueron efectivamente evaluados.';
 }
 function showProviderMapDetail(p){
- const compliance=p.compliance===null?'Sin datos':`${p.compliance}%`;
- const iirs=p.iirs===null?'Sin auditoría':p.iirs.toFixed(1);
- document.getElementById('providerMapDetail').innerHTML=`
-  <div class="map-risk-chip map-risk-${providerRiskKey(p)}">${providerRiskLabel(p)}</div>
-  <h2>${esc(p.name)}</h2>
-  <p><b>${esc(p.city)}, ${esc(p.province)}</b></p>
-  <dl class="provider-detail-list">
-   <div><dt>Tipo</dt><dd>${esc(p.type)}</dd></div><div><dt>Complejidad</dt><dd>${esc(p.complexity)}</dd></div>
-   <div><dt>Modalidad</dt><dd>${esc(p.module)}</dd></div><div><dt>Cápitas</dt><dd>${p.capitas.toLocaleString('es-AR')}</dd></div>
-   <div><dt>Cumplimiento</dt><dd>${compliance}</dd></div><div><dt>IIRS</dt><dd>${iirs}</dd></div>
-   <div><dt>Última auditoría</dt><dd>${esc(p.lastAudit)}</dd></div>
-  </dl>
-  <h3>Áreas auditadas</h3><p>${p.areas.length?p.areas.map(esc).join(' · '):'Todavía no registra áreas auditadas.'}</p>
-  <button class="primary" type="button" onclick="alert('En la versión definitiva este botón abrirá la ficha completa del prestador, su historial, auditorías y planes de mejora.')">Ver ficha completa</button>`;
+ const compliance=p.compliance===null||p.compliance===undefined?'Sin datos':`${p.compliance.toFixed(1)}%`,iirs=p.iirs===null||p.iirs===undefined?'Sin auditoría':p.iirs.toFixed(2);
+ const metrics=(p.areaMetrics||[]).length?`<table><thead><tr><th>Área</th><th>Evaluados</th><th>Desvíos</th><th>IIRS</th></tr></thead><tbody>${p.areaMetrics.map(x=>`<tr><td>${esc(x.service)}</td><td>${x.evaluated}</td><td>${x.deviations}</td><td>${x.iirs==null?'—':x.iirs.toFixed(2)}</td></tr>`).join('')}</tbody></table>`:`<p>${p.areas.length?p.areas.map(esc).join(' · '):'Todavía no registra áreas evaluadas.'}</p>`;
+ document.getElementById('providerMapDetail').innerHTML=`<div class="map-risk-chip map-risk-${providerRiskKey(p)}">${providerRiskLabel(p)}</div><h2>${esc(p.name)}</h2><p><b>${esc(p.city||p.province)}, ${esc(p.province)}</b></p>${p.locationApprox?'<div class="notice"><b>Ubicación aproximada.</b> La auditoría no contiene coordenadas; el punto se representa dentro de la provincia declarada.</div>':''}<dl class="provider-detail-list"><div><dt>Tipo</dt><dd>${esc(p.type)}</dd></div><div><dt>Complejidad</dt><dd>${esc(p.complexity)}</dd></div><div><dt>Fuente</dt><dd>${p.demo?'Demostración':'Auditoría SIAPE guardada'}</dd></div><div><dt>Cumplimiento</dt><dd>${compliance}</dd></div><div><dt>IIRS</dt><dd>${iirs}</dd></div><div><dt>Última auditoría</dt><dd>${esc(p.lastAudit)}</dd></div></dl><h3>Resultados por área</h3>${metrics}`;
 }
-function resetProviderMapFilters(){['providerMapSearch','providerMapProvince','providerMapComplexity','providerMapRisk'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});renderProviderMapMarkers();if(providerMapInstance)providerMapInstance.setView([-38.4,-63.6],4);document.getElementById('providerMapDetail').innerHTML='<h2>Información del prestador</h2><p class="small">Seleccione un punto del mapa para consultar sus datos.</p>'}
-
+function resetProviderMapFilters(){['providerMapSearch','providerMapProvince','providerMapComplexity','providerMapRisk'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});renderProviderMap();if(providerMapInstance)providerMapInstance.setView([-38.4,-63.6],4);document.getElementById('providerMapDetail').innerHTML='<h2>Información del prestador</h2><p class="small">Seleccione un punto del mapa para consultar sus datos.</p>'}
 
 // SIGAP V3.4.2 · Demostración de Derivación y Seguimiento
 const FOLLOWUP_DEMO_CASES = [
@@ -1107,7 +1263,8 @@ const FOLLOWUP_LIVE_KEY='sigap_followup_live_status_v1';
 function saveFollowupDemo(){localStorage.setItem('sigap_followup_demo',JSON.stringify(followupDemoState))}
 function currentAuditFollowupCase(){
  const nursing=deviations().map(i=>{const t=technicalFor(i);return {id:i.code,area:i.service||'Enfermería',service:i.service||'Enfermería',risk:i.score||3,deviation:t.deviation,recommendation:t.rec,evidence:t.ev,deadline:t.plazo||'A definir',status:'pendiente',followupNote:'',source:'general'}});
- const all=[...nursing];if(!all.length)return null;
+ const laboratory=labDeviations().map(i=>{const t=technicalFor(i);return {id:i.code,area:'Laboratorio',service:'Laboratorio',risk:i.score||3,deviation:t.deviation,recommendation:t.rec,evidence:t.ev,deadline:t.plazo||'A definir',status:'pendiente',followupNote:'',source:'laboratorio'}});
+ const all=[...nursing,...laboratory];if(!all.length)return null;
  const saved=JSON.parse(localStorage.getItem(FOLLOWUP_LIVE_KEY)||'{}');
  all.forEach(d=>{const k=`${d.source||'x'}:${d.id}`;if(saved[k])Object.assign(d,saved[k])});
  const provider=state.meta.prestador||'Auditoría actual';
@@ -1218,7 +1375,7 @@ function renderAdminUsers(){
   const email=normalizeEmail(u.correo||u.id),self=email===normalizeEmail(currentSessionUser?.email),primary=normalizeEmail(currentSessionUser?.email)===PRIMARY_ADMIN_EMAIL;
   const roleOptions=['auditor','gerente','subgerente','jefa_medicas','jefa_sociales','administrador'].map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${roleLabel(r)}</option>`).join('');
   const specialtyOptions=[
-   ['','Sin asignar'],['enfermeria','Enfermería'],['medica','Médica'],['farmacia','Farmacia'],['imagenes','Imágenes'],['psicologia','Psicología / Salud Mental'],['hemoterapia','Hemoterapia'],['nutricion','Nutrición'],['administracion','Administración'],['sociales','Social']
+   ['','Sin asignar'],['enfermeria','Enfermería'],['laboratorio','Laboratorio / Bioquímica'],['medica','Médica'],['farmacia','Farmacia'],['imagenes','Imágenes'],['psicologia','Psicología / Salud Mental'],['hemoterapia','Hemoterapia'],['nutricion','Nutrición'],['administracion','Administración'],['sociales','Social']
   ].map(([v,l])=>`<option value="${v}" ${String(u.especialidad||'')===v?'selected':''}>${l}</option>`).join('');
   return `<div class="admin-user-card"><div class="admin-user-head"><div><div class="admin-user-name">${esc(`${u.nombre||''} ${u.apellido||''}`.trim()||email)}</div><div class="admin-user-meta">${esc(email)}<br>Rol: ${esc(roleLabel(u.rol||'auditor'))}<br>Especialidad: ${esc(specialtyLabel(u.especialidad))}</div></div><span class="user-state user-state-${esc(u.estado||'pendiente')}">${esc(u.estado||'pendiente')}</span></div><div class="admin-user-actions">${u.estado!=='autorizado'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Autorizar</button>`:''}${u.estado!=='rechazado'?`<button class="secondary" onclick="setUserStatus('${esc(email)}','rechazado')">Rechazar</button>`:''}${u.estado==='autorizado'&&!self?`<button class="danger" onclick="setUserStatus('${esc(email)}','suspendido')">Suspender</button>`:''}${u.estado==='suspendido'?`<button class="primary" onclick="setUserStatus('${esc(email)}','autorizado')">Reactivar</button>`:''}${!self?`<button class="danger" onclick="deleteUserRecord('${esc(email)}')">Eliminar registro</button>`:''}</div><div class="role-editor"><label>Especialidad operativa</label><select id="specialty-${safeDomId(email)}">${specialtyOptions}</select><button class="secondary" onclick="setUserSpecialty('${esc(email)}')">Guardar especialidad</button></div>${primary?`<div class="role-editor"><label>Rol</label><select id="role-${safeDomId(email)}">${roleOptions}</select><button class="secondary" onclick="setUserRole('${esc(email)}')">Guardar rol</button></div>`:''}</div>`;
  }).join('');
@@ -1226,7 +1383,7 @@ function renderAdminUsers(){
 
 function specialtyLabel(v){
  const x=String(v||'').toLowerCase();
- return ({enfermeria:'Enfermería',medica:'Médica',farmacia:'Farmacia',imagenes:'Imágenes',psicologia:'Psicología / Salud Mental',hemoterapia:'Hemoterapia',nutricion:'Nutrición',administracion:'Administración',sociales:'Social'})[x]||'Sin asignar';
+ return ({enfermeria:'Enfermería',laboratorio:'Laboratorio / Bioquímica',medica:'Médica',farmacia:'Farmacia',imagenes:'Imágenes',psicologia:'Psicología / Salud Mental',hemoterapia:'Hemoterapia',nutricion:'Nutrición',administracion:'Administración',sociales:'Social'})[x]||'Sin asignar';
 }
 function applySpecialtyVisibility(){
  const startBtn=document.getElementById('startAuditButton');
@@ -1236,7 +1393,7 @@ function auditorAreaRoleLabel(){
  const role=String(currentSessionUser?.role||'auditor').toLowerCase();
  if(role!=='auditor')return roleLabel(role);
  const sp=String(currentSessionUser?.profile?.especialidad||currentSessionUser?.profile?.especialidadOperativa||'').toLowerCase();
- return ({enfermeria:'Auditor del Área de Enfermería',medica:'Auditor del Área Médica',farmacia:'Auditor del Área Farmacia',imagenes:'Auditor del Área Imágenes',psicologia:'Auditor del Área Psicología / Salud Mental',hemoterapia:'Auditor del Área Hemoterapia',nutricion:'Auditor del Área Nutrición',administracion:'Auditor del Área Administración',sociales:'Auditor del Área Social'})[sp]||'Auditor';
+ return ({enfermeria:'Auditor del Área de Enfermería',laboratorio:'Auditor del Área Laboratorio',medica:'Auditor del Área Médica',farmacia:'Auditor del Área Farmacia',imagenes:'Auditor del Área Imágenes',psicologia:'Auditor del Área Psicología / Salud Mental',hemoterapia:'Auditor del Área Hemoterapia',nutricion:'Auditor del Área Nutrición',administracion:'Auditor del Área Administración',sociales:'Auditor del Área Social'})[sp]||'Auditor';
 }
 function roleLabel(role){return({administrador:'Administrador',gerente:'Gerente',subgerente:'Subgerente',jefa_medicas:'Jefa Departamento Médicas',jefa_sociales:'Jefa Departamento Sociales',auditor:'Auditor'})[role]||role}
 function safeDomId(v){return String(v).replace(/[^a-z0-9_-]/gi,'_')}

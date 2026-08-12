@@ -1,0 +1,43 @@
+SIAPE GAP V3.4.18 · ÁREA LABORATORIO INTEGRADA
+
+OBJETIVO
+Se incorpora Laboratorio como una solapa profesional independiente, conservando sin cambios el Área Enfermería integrada.
+
+ESTRUCTURA DEL ÁREA LABORATORIO
+- Guía del área.
+- Datos del servicio.
+- Entrevista y notas exclusiva de Laboratorio.
+- Desvíos automáticos a partir de respuestas NO.
+- Plan de mejora.
+- Resumen y acta.
+- Normativa / referencias técnicas.
+- Informe PDF de Laboratorio con anexo técnico y fotografías.
+
+FUENTES APORTADAS PARA LA CONSTRUCCIÓN
+1. Guía institucional "II NIVEL LABORATORIO - INTEGRAL - NIVEL CENTRAL".
+2. Supermatriz de riesgo de Laboratorio 07-08-2026.
+3. Tabla de criticidad y frecuencia de desvíos de Laboratorio de auditorías 2025 (N=46).
+
+CRITERIO DE INTEGRACIÓN
+- La guía institucional se conserva como base de los requisitos.
+- La Supermatriz se usa para reforzar procesos PREANALÍTICO, ANALÍTICO, POSTANALÍTICO y APOYO, indicadores y trazabilidad.
+- La criticidad histórica 2025 se incorpora como antecedente técnico cuando existe correspondencia directa.
+- La frecuencia histórica es informativa: NO incrementa automáticamente el IIRS de la auditoría actual.
+- El IIRS actual se calcula solamente con requisitos efectivamente evaluados: SI=0, NO=riesgo propio del ítem; NO APLICA y no evaluados se excluyen.
+
+CONSOLIDACIÓN EJECUTIVA
+Panel general, ranking, tablero ejecutivo y mapa prestacional pueden consolidar:
+Enfermería, Esterilización, Lavadero, Limpieza, Hemodinamia y Laboratorio.
+Solo se computan áreas con respuestas SI/NO efectivamente cargadas.
+
+MAPA PRESTACIONAL
+- Utiliza la auditoría guardada más reciente de cada prestador en ESTE dispositivo.
+- Muestra IIRS, cumplimiento, desvíos y resultados por área.
+- Si no hay coordenadas, la ubicación se representa de forma aproximada dentro de la provincia y se informa esta condición.
+- Si no hay auditorías locales evaluadas, conserva una muestra ficticia mínima para demostrar el módulo.
+
+LIMITACIÓN ACTUAL
+La consolidación entre distintos dispositivos todavía requiere sincronización de auditorías con una base central segura (Firestore u otra). Esta versión no modifica las reglas institucionales de sincronización ni publica automáticamente auditorías en la nube.
+
+ARCHIVO NUEVO
+laboratorio-v2.js contiene la guía reconstruida. No utiliza los antiguos laboratorio.js / laboratorio-data.js.

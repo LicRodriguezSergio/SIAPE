@@ -78,3 +78,14 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Desvíos estandarizados ampliados con antecedentes vinculados del Excel y opción de redacción propia.
 - Pestaña activa resaltada.
 - Mapa circular multinivel de riesgo dinámico (proceso, subproceso y requisito).
+
+## V3.4.18 - Área Laboratorio integrada
+- Se incorpora Laboratorio como solapa profesional independiente.
+- Nueva guía de 89 requisitos construida desde la guía institucional, Supermatriz y criticidad histórica 2025.
+- Datos del servicio: Dirección Técnica, RRHH, horarios, modalidad, funcionamiento y equipamiento.
+- Entrevista única de Laboratorio.
+- Desvíos, plan de mejora, resumen/acta, referencias e informe PDF propios de Laboratorio.
+- Panel general, ranking y tablero ejecutivo consolidan Enfermería, Esterilización, Lavadero, Limpieza, Hemodinamia y Laboratorio cuando existen respuestas evaluadas.
+- Mapa prestacional usa la auditoría local guardada más reciente de cada prestador, muestra IIRS/desvíos por área y utiliza ubicación aproximada por provincia cuando no existen coordenadas.
+- Seguimiento incorpora también los desvíos de Laboratorio de la auditoría actual.
+- Caché PWA actualizada a V3.4.18.
