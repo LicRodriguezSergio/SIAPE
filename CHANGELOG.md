@@ -1,3 +1,11 @@
+# SIAPE GAP V3.4.25
+
+- Corrección definitiva de navegación entre las cuatro guías del Área Imágenes.
+- Se eliminan manejadores `onclick` generados con comillas incompatibles.
+- Las pestañas se crean con eventos `addEventListener`, compatibles con PC y tablet.
+- Al cambiar de guía se mantienen respuestas guardadas y se reinician únicamente los filtros de dominio/modalidad.
+- Sin cambios en requisitos, IIRS, Informe Integral, Tablero Ejecutivo ni Mapa Prestacional.
+
 ## V3.4.24 · Corrección navegación Área Imágenes
 - Corrige la selección de las cuatro guías de Imágenes.
 - El cambio de guía ahora se realiza mediante una función global explícita y actualiza la pestaña activa.

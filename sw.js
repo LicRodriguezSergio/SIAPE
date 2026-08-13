@@ -1,4 +1,4 @@
-const CACHE='siape-v3424-imagenes-navegacion';
+const CACHE='siape-v3425-imagenes-navegacion-estable';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./data.js','./imagenes-data.js','./imagenes.js','./laboratorio-v2.js','./lab-risk.js','./manifest.json','./firebase-config.js','./pami-logo.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));

@@ -1,4 +1,4 @@
-// SIAPE GAP V3.4.24 · Módulo Área Imágenes · Corrección navegación entre guías
+// SIAPE GAP V3.4.25 · Módulo Área Imágenes · Navegación estable entre guías
 const IMG_SUBGUIDES=[...new Set((typeof IMAGENES_ITEMS!=='undefined'?IMAGENES_ITEMS:[]).map(i=>i.subguide).filter(Boolean))];
 window.currentImgSubguide=IMG_SUBGUIDES[0]||'';
 function defaultImagesInterview(){return {date:new Date().toISOString().slice(0,10),time:'',place:'',area:'Imágenes',interviewees:'',auditors:'',summary:'',documents:'',commitments:'',additional:'',auditorNotes:'',includeInReport:true}}
@@ -18,10 +18,22 @@ function selectImgSubguide(g){
  renderImgAudit();
 }
 window.selectImgSubguide=selectImgSubguide;
-function imgGuideButton(g){const n=imgItems().filter(i=>i.subguide===g).length;return `<button type="button" class="service-tab ${g===window.currentImgSubguide?'active':''}" onclick="selectImgSubguide(${JSON.stringify(g)})">${esc(g)} (${n})</button>`}
+function renderImgGuideTabs(){
+ const tabs=document.getElementById('imgGuideTabs');
+ if(!tabs)return;
+ tabs.replaceChildren();
+ IMG_SUBGUIDES.forEach(g=>{
+  const b=document.createElement('button');
+  b.type='button';
+  b.className='service-tab'+(g===window.currentImgSubguide?' active':'');
+  b.textContent=`${g} (${imgItems().filter(i=>i.subguide===g).length})`;
+  b.addEventListener('click',()=>selectImgSubguide(g));
+  tabs.appendChild(b);
+ });
+}
 function renderImgAudit(){
  if(!IMG_SUBGUIDES.includes(window.currentImgSubguide))window.currentImgSubguide=IMG_SUBGUIDES[0]||'';
- const tabs=document.getElementById('imgGuideTabs');if(tabs)tabs.innerHTML=IMG_SUBGUIDES.map(imgGuideButton).join('');
+ renderImgGuideTabs();
  const q=(document.getElementById('imgSearch')?.value||'').toLowerCase(),dsel=document.getElementById('imgDomainFilter'),msel=document.getElementById('imgModalityFilter');
  const domain=dsel?.value||'',modality=msel?.value||'',base=imgGuideItems();
  const domains=[...new Set(base.map(i=>i.domain).filter(Boolean))],modalities=[...new Set(base.map(i=>i.modality).filter(Boolean))];
