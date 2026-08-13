@@ -1,3 +1,11 @@
+# V3.4.22 - Actualización automática del Mapa Prestacional
+
+- Corrige el panel de detalle del Mapa Prestacional para que no conserve datos anteriores luego de guardar una auditoría.
+- Al guardar, el mapa vuelve a leer la copia más reciente del prestador.
+- El prestador seleccionado se mantiene y su tabla de Resultados por área se actualiza automáticamente.
+- Laboratorio aparece en el mapa en cuanto tenga requisitos SI/NO evaluados y la auditoría sea guardada.
+- Corrige el título visible del navegador a V3.4.22.
+
 ## V3.4.19 · Criterio profesional del auditor
 - Textos técnicos editables/reemplazables en hallazgos NO.
 - PDF, plan, acta, desvíos y seguimiento toman el texto final del auditor.
@@ -112,3 +120,13 @@ El ranking y el tablero se calculan con las auditorías guardadas en el disposit
 - Conclusiones editables por el auditor, con sugerencia SIAPE y límite de 700 caracteres (aprox. hasta 10 renglones).
 - Se elimina el acceso operativo al PDF separado de Laboratorio; ambas áreas abren el Informe Integral.
 - Fotografías del informe integral incorporan también desvíos de Laboratorio.
+
+## V3.4.23 · Área Imágenes integrada
+- Incorpora la solapa profesional **Imágenes**.
+- Integra cuatro guías: Diagnóstico por Imágenes Ambulatorio, Diagnóstico por Imágenes de II Nivel, Medicina Nuclear y Terapia Radiante.
+- Evita duplicar Hemodinamia, que permanece dentro del Área Enfermería.
+- Agrega entrevista/notas, desvíos, plan de mejora, resumen/acta y fuentes del Área Imágenes.
+- Conserva la edición profesional de las sugerencias automáticas de SIAPE.
+- Integra Imágenes al Informe Integral ejecutivo.
+- Integra Imágenes al Panel general, Tablero ejecutivo, Seguimiento y Mapa prestacional.
+- Actualiza caché/PWA para evitar carga de versiones anteriores.

@@ -1,0 +1,23 @@
+SIAPE GAP V3.4.23 · ÁREA IMÁGENES INTEGRADA
+
+Se incorpora Imágenes como nueva área profesional independiente, con la misma metodología operativa de Enfermería y Laboratorio.
+
+Guías adaptadas de los archivos fuente recibidos:
+- Diagnóstico por Imágenes Ambulatorio
+- Diagnóstico por Imágenes · II Nivel
+- Medicina Nuclear
+- Terapia Radiante
+
+La guía de Hemodinamia incluida en el paquete fuente no se duplica porque Hemodinamia ya forma parte del Área Enfermería en SIAPE.
+
+Área Imágenes incluye:
+- Guías del área y filtros por guía, modalidad y dominio.
+- Respuestas SI / NO / NO APLICA / NO EVALUADO.
+- Observación, evidencia y fotografías.
+- Propuestas SIAPE editables por el auditor para desvío, fundamentación, recomendación, evidencia, responsable y plazo.
+- Una entrevista/notas para toda el Área Imágenes.
+- Desvíos, plan de mejora, resumen/acta y fuentes/normativa.
+- Integración automática al Informe Integral: entrevista/notas, desvíos y conclusión breve del Área Imágenes.
+- Integración automática a Panel general, Tablero ejecutivo, Seguimiento y Mapa prestacional cuando existan requisitos efectivamente evaluados y la auditoría se guarde.
+
+IMPORTANTE: las referencias normativas contenidas en los documentos fuente se conservaron como referencias a validar. Antes de usarlas como fundamento legal directo debe verificarse texto oficial, vigencia, jurisdicción y aplicabilidad.
