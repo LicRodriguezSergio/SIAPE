@@ -1,3 +1,9 @@
+## V3.4.24 · Corrección navegación Área Imágenes
+- Corrige la selección de las cuatro guías de Imágenes.
+- El cambio de guía ahora se realiza mediante una función global explícita y actualiza la pestaña activa.
+- Al cambiar de guía se limpian los filtros de dominio/modalidad para evitar que un filtro de la guía anterior oculte requisitos.
+- No modifica requisitos, respuestas, IIRS, Informe Integral, Tablero Ejecutivo ni Mapa Prestacional.
+
 # V3.4.22 - Actualización automática del Mapa Prestacional
 
 - Corrige el panel de detalle del Mapa Prestacional para que no conserve datos anteriores luego de guardar una auditoría.

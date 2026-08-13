@@ -1,0 +1,4 @@
+SIAPE GAP V3.4.24 · CORRECCIÓN NAVEGACIÓN IMÁGENES
+
+Se corrigió el cambio entre las guías Diagnóstico por Imágenes Ambulatorio, Diagnóstico por Imágenes - II Nivel, Medicina Nuclear y Terapia Radiante.
+No se modificaron contenidos ni cálculos de las guías.

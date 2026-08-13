@@ -1,17 +1,26 @@
-// SIAPE GAP V3.4.23 · Módulo Área Imágenes
+// SIAPE GAP V3.4.24 · Módulo Área Imágenes · Corrección navegación entre guías
 const IMG_SUBGUIDES=[...new Set((typeof IMAGENES_ITEMS!=='undefined'?IMAGENES_ITEMS:[]).map(i=>i.subguide).filter(Boolean))];
-let currentImgSubguide=IMG_SUBGUIDES[0]||'';
+window.currentImgSubguide=IMG_SUBGUIDES[0]||'';
 function defaultImagesInterview(){return {date:new Date().toISOString().slice(0,10),time:'',place:'',area:'Imágenes',interviewees:'',auditors:'',summary:'',documents:'',commitments:'',additional:'',auditorNotes:'',includeInReport:true}}
 function imgItems(){return ITEMS.filter(i=>i.service==='Imágenes'&&state.enabled['Imágenes']!==false&&applicable(i))}
-function imgGuideItems(guide=currentImgSubguide){return imgItems().filter(i=>!guide||i.subguide===guide)}
+function imgGuideItems(guide=window.currentImgSubguide){return imgItems().filter(i=>!guide||i.subguide===guide)}
 function imgDeviations(){return imgItems().filter(i=>answerFor(i.code).response==='NO')}
 function imgStats(items=imgItems()){
  const evaluated=items.filter(i=>['SI','NO'].includes(answerFor(i.code).response)),yes=evaluated.filter(i=>answerFor(i.code).response==='SI').length,dev=evaluated.filter(i=>answerFor(i.code).response==='NO');
  return {active:items.length,evaluated:evaluated.length,dev:dev.length,high:dev.filter(i=>Number(i.score)>=4).length,compliance:evaluated.length?yes/evaluated.length:0,index:iirsForItems(items,answerFor)};
 }
-function imgGuideButton(g){const n=imgItems().filter(i=>i.subguide===g).length;return `<button class="service-tab ${g===currentImgSubguide?'active':''}" onclick="currentImgSubguide=${JSON.stringify(g)};renderImgAudit()">${esc(g)} (${n})</button>`}
+function selectImgSubguide(g){
+ if(!IMG_SUBGUIDES.includes(g))return;
+ window.currentImgSubguide=g;
+ const d=document.getElementById('imgDomainFilter'),m=document.getElementById('imgModalityFilter');
+ if(d)d.value='';
+ if(m)m.value='';
+ renderImgAudit();
+}
+window.selectImgSubguide=selectImgSubguide;
+function imgGuideButton(g){const n=imgItems().filter(i=>i.subguide===g).length;return `<button type="button" class="service-tab ${g===window.currentImgSubguide?'active':''}" onclick="selectImgSubguide(${JSON.stringify(g)})">${esc(g)} (${n})</button>`}
 function renderImgAudit(){
- if(!IMG_SUBGUIDES.includes(currentImgSubguide))currentImgSubguide=IMG_SUBGUIDES[0]||'';
+ if(!IMG_SUBGUIDES.includes(window.currentImgSubguide))window.currentImgSubguide=IMG_SUBGUIDES[0]||'';
  const tabs=document.getElementById('imgGuideTabs');if(tabs)tabs.innerHTML=IMG_SUBGUIDES.map(imgGuideButton).join('');
  const q=(document.getElementById('imgSearch')?.value||'').toLowerCase(),dsel=document.getElementById('imgDomainFilter'),msel=document.getElementById('imgModalityFilter');
  const domain=dsel?.value||'',modality=msel?.value||'',base=imgGuideItems();
